@@ -14,6 +14,27 @@ public class OverheadController : MonoBehaviour
     public bool useOrthographic = true; // animal crossing
     public float orthographicSize = 8f;
 
+    [Header("Animal Crossing Style Camera")]
+    [SerializeField] private bool useSnapRotation = true;
+    [SerializeField] private float snapRotationSpeed = 5f;
+    [SerializeField] private float snapRotationThreshold = 0.1f;
+    private float targetCameraAngle = 0f;
+    private bool isRotating = false;
+
+    [Header("Up Arrow Camera Adjustment")]
+    [SerializeField] private bool enableUpArrowAdjustment = true;
+    [SerializeField] private float upViewCameraHeight = 8f;
+    [SerializeField] private float upViewCameraDistance = 5f;
+    [SerializeField] private float upViewCameraAngle = 25f;
+    [SerializeField] private float upViewTransitionSpeed = 3f;
+    [SerializeField] private float upViewOrthographicSize = 12f;
+
+    private float defaultCameraHeight;
+    private float defaultCameraDistance;
+    private float defaultCameraAngle;
+    private float defaultOrthographicSize;
+    private bool isUpViewActive = false;
+
     private float currentCameraAngle = 0f;
 
     [Header("Camera Collision")]
@@ -39,6 +60,11 @@ public class OverheadController : MonoBehaviour
     private float targetCameraDistance;
     private float cameraDistanceVelocity;
 
+    // Input handling
+    private bool qPressed = false;
+    private bool ePressed = false;
+    private bool movementEnabled = true;
+
     void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -51,9 +77,17 @@ public class OverheadController : MonoBehaviour
 
         cam = cameraTransform.GetComponent<Camera>();
 
-        // Initialize camera distance
+        // Store default camera values
+        defaultCameraHeight = cameraHeight;
+        defaultCameraDistance = cameraDistance;
+        defaultCameraAngle = cameraAngle;
+        defaultOrthographicSize = orthographicSize;
+
+        // Initialize camera distance and angle
         currentCameraDistance = cameraDistance;
         targetCameraDistance = cameraDistance;
+        targetCameraAngle = 0f;
+        currentCameraAngle = 0f;
 
         SetupCamera();
         CalculateCameraOffset();
@@ -107,6 +141,8 @@ public class OverheadController : MonoBehaviour
         HandleGroundCheck();
         HandleMovement();
         HandleCameraControls();
+        HandleUpArrowAdjustment();
+        HandleSnapRotation();
         HandleCameraCollision();
         HandleCameraFollow();
         HandleGravity();
@@ -116,6 +152,91 @@ public class OverheadController : MonoBehaviour
         {
             Cursor.lockState = Cursor.lockState == CursorLockMode.Locked ?
                 CursorLockMode.None : CursorLockMode.Locked;
+        }
+    }
+
+    void HandleUpArrowAdjustment()
+    {
+        if (!enableUpArrowAdjustment) return;
+
+        bool upPressed = Input.GetKey(KeyCode.G);
+
+        if (upPressed && !isUpViewActive)
+        {
+            // Transition to up view
+            isUpViewActive = true;
+        }
+        else if (!upPressed && isUpViewActive)
+        {
+            // Transition back to normal view
+            isUpViewActive = false;
+        }
+
+        // Smoothly interpolate between normal and up view settings
+        float targetHeight = isUpViewActive ? upViewCameraHeight : defaultCameraHeight;
+        float targetDistance = isUpViewActive ? upViewCameraDistance : defaultCameraDistance;
+        float targetAngle = isUpViewActive ? upViewCameraAngle : defaultCameraAngle;
+        float targetOrthoSize = isUpViewActive ? upViewOrthographicSize : defaultOrthographicSize;
+
+        // Smooth transitions
+        cameraHeight = Mathf.Lerp(cameraHeight, targetHeight, Time.deltaTime * upViewTransitionSpeed);
+        cameraDistance = Mathf.Lerp(cameraDistance, targetDistance, Time.deltaTime * upViewTransitionSpeed);
+        cameraAngle = Mathf.Lerp(cameraAngle, targetAngle, Time.deltaTime * upViewTransitionSpeed);
+
+        if (useOrthographic && cam != null)
+        {
+            orthographicSize = Mathf.Lerp(orthographicSize, targetOrthoSize, Time.deltaTime * upViewTransitionSpeed);
+            cam.orthographicSize = orthographicSize;
+        }
+
+        // Update target camera distance for collision system
+        targetCameraDistance = cameraDistance;
+    }
+
+
+    void HandleSnapRotation()
+    {
+        if (!useSnapRotation) return;
+
+        // Handle Q and E input for 90-degree snaps
+        bool qPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
+        bool ePressedThisFrame = Input.GetKeyDown(KeyCode.E);
+
+        if (qPressedThisFrame && !isRotating)
+        {
+            // Rotate 90 degrees counter-clockwise
+            targetCameraAngle -= 90f;
+            isRotating = true;
+        }
+        else if (ePressedThisFrame && !isRotating)
+        {
+            // Rotate 90 degrees clockwise
+            targetCameraAngle += 90f;
+            isRotating = true;
+        }
+
+        // Normalize target angle to 0-360 range
+        while (targetCameraAngle < 0) targetCameraAngle += 360f;
+        while (targetCameraAngle >= 360f) targetCameraAngle -= 360f;
+
+        // Smooth rotation towards target
+        if (isRotating)
+        {
+            float angleDifference = Mathf.DeltaAngle(currentCameraAngle, targetCameraAngle);
+            currentCameraAngle += Mathf.Sign(angleDifference) * snapRotationSpeed * 90f * Time.deltaTime;
+
+            // Check if we're close enough to snap to target
+            if (Mathf.Abs(Mathf.DeltaAngle(currentCameraAngle, targetCameraAngle)) < snapRotationThreshold)
+            {
+                currentCameraAngle = targetCameraAngle;
+                isRotating = false;
+            }
+
+            // Normalize current angle
+            while (currentCameraAngle < 0) currentCameraAngle += 360f;
+            while (currentCameraAngle >= 360f) currentCameraAngle -= 360f;
+
+            CalculateCameraOffset();
         }
     }
 
@@ -175,6 +296,8 @@ public class OverheadController : MonoBehaviour
 
     void HandleMovement()
     {
+        if (!movementEnabled) return;
+
         // Get input
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
@@ -183,10 +306,19 @@ public class OverheadController : MonoBehaviour
 
         if (inputDirection.magnitude >= 0.1f)
         {
-            // For overhead view, we want movement relative to world axes
+            // For overhead view, we want movement relative to current camera angle
             Vector3 moveDirection;
 
-            if (allowCameraRotation)
+            if (useSnapRotation)
+            {
+                // Move relative to current camera orientation (Animal Crossing style)
+                float cameraRad = currentCameraAngle * Mathf.Deg2Rad;
+                Vector3 cameraForward = new Vector3(Mathf.Sin(cameraRad), 0, Mathf.Cos(cameraRad));
+                Vector3 cameraRight = new Vector3(Mathf.Cos(cameraRad), 0, -Mathf.Sin(cameraRad));
+
+                moveDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x);
+            }
+            else if (allowCameraRotation)
             {
                 // Move relative to camera orientation
                 Vector3 cameraForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
@@ -196,7 +328,7 @@ public class OverheadController : MonoBehaviour
             }
             else
             {
-                // Move relative to world axes (classic Animal Crossing style)
+                // Move relative to world axes (classic style)
                 moveDirection = inputDirection;
             }
 
@@ -215,7 +347,8 @@ public class OverheadController : MonoBehaviour
 
     void HandleCameraControls()
     {
-        if (allowCameraRotation)
+        // Only handle continuous rotation if not using snap rotation
+        if (allowCameraRotation && !useSnapRotation)
         {
             // camera rotation Q and E
             if (Input.GetKey(KeyCode.Q))
@@ -229,12 +362,13 @@ public class OverheadController : MonoBehaviour
         }
 
         // Zoom in/out with scroll wheel
-        if (useOrthographic && cam != null)
+        if (useOrthographic && cam != null && !isUpViewActive)
         {
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0f)
             {
-                orthographicSize = Mathf.Clamp(orthographicSize - scroll * 2f, 3f, 15f);
+                defaultOrthographicSize = Mathf.Clamp(defaultOrthographicSize - scroll * 2f, 3f, 15f);
+                orthographicSize = defaultOrthographicSize;
                 cam.orthographicSize = orthographicSize;
             }
         }
@@ -243,6 +377,7 @@ public class OverheadController : MonoBehaviour
     void RotateCamera(float rotationAmount)
     {
         currentCameraAngle += rotationAmount;
+        targetCameraAngle = currentCameraAngle;
         CalculateCameraOffset();
     }
 
@@ -271,30 +406,70 @@ public class OverheadController : MonoBehaviour
 
     public void SetCameraHeight(float height)
     {
-        cameraHeight = height;
-        CalculateCameraOffset();
+        defaultCameraHeight = height;
+        if (!isUpViewActive)
+        {
+            cameraHeight = height;
+            CalculateCameraOffset();
+        }
     }
 
     public void SetCameraAngle(float angle)
     {
-        cameraAngle = angle;
-        CalculateCameraOffset();
-        PositionCamera();
+        defaultCameraAngle = angle;
+        if (!isUpViewActive)
+        {
+            cameraAngle = angle;
+            CalculateCameraOffset();
+            PositionCamera();
+        }
     }
 
     public void SetCameraDistance(float distance)
     {
-        cameraDistance = distance;
-        targetCameraDistance = distance;
+        defaultCameraDistance = distance;
+        if (!isUpViewActive)
+        {
+            cameraDistance = distance;
+            targetCameraDistance = distance;
+        }
     }
 
     public void SetOrthographicSize(float size)
     {
         if (cam != null && useOrthographic)
         {
-            orthographicSize = size;
-            cam.orthographicSize = orthographicSize;
+            defaultOrthographicSize = size;
+            if (!isUpViewActive)
+            {
+                orthographicSize = size;
+                cam.orthographicSize = orthographicSize;
+            }
         }
+    }
+
+    // Public methods for external control
+    public void SnapRotateLeft()
+    {
+        if (useSnapRotation && !isRotating)
+        {
+            targetCameraAngle -= 90f;
+            isRotating = true;
+        }
+    }
+
+    public void SnapRotateRight()
+    {
+        if (useSnapRotation && !isRotating)
+        {
+            targetCameraAngle += 90f;
+            isRotating = true;
+        }
+    }
+
+    public void SetUpView(bool enabled)
+    {
+        isUpViewActive = enabled;
     }
 
     // Debug visualization
@@ -319,5 +494,30 @@ public class OverheadController : MonoBehaviour
         Gizmos.color = Color.green;
         Vector3 minDistancePos = playerPosition + desiredCameraDirection * minCameraDistance + Vector3.up * cameraHeight;
         Gizmos.DrawWireSphere(minDistancePos, cameraCollisionRadius);
+
+        // Draw camera angle indicators
+        Gizmos.color = Color.blue;
+        Vector3 forward = Quaternion.Euler(0, currentCameraAngle, 0) * Vector3.forward;
+        Gizmos.DrawRay(transform.position, forward * 3f);
+
+        // Draw target angle if rotating
+        if (isRotating)
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 targetForward = Quaternion.Euler(0, targetCameraAngle, 0) * Vector3.forward;
+            Gizmos.DrawRay(transform.position, targetForward * 3f);
+        }
+    }
+
+    public void SetMovementEnabled(bool enabled)
+    {
+        movementEnabled = enabled;
+        Debug.Log($"OverheadController movement enabled: {enabled}");
+    }
+
+    public bool IsMovementEnabled()
+    {
+        return movementEnabled;
     }
 }
+
