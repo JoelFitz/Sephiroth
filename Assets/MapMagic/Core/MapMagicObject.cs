@@ -31,7 +31,7 @@ namespace MapMagic.Core
 	[DisallowMultipleComponent]
 	public class MapMagicObject : MonoBehaviour, IMapMagic, ISerializationCallbackReceiver
 	{
-		public static readonly SemVer version = new SemVer(2,1,16); 
+		public static readonly SemVer version = new SemVer(2,1,19); 
 
 		//graph
 		public Graph graph;

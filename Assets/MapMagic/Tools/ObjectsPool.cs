@@ -114,8 +114,7 @@ namespace Den.Tools
 					
 				for (int i=instancesCount; i<targetCount; i++)
 				{
-					GameObject gobj = InstantiateObject();
-					gobj.transform.parent = parent;
+					GameObject gobj = InstantiateObject(parent);
 					gobj.hideFlags = parent.gameObject.hideFlags;
 
 					instances.Add(gobj);
@@ -197,7 +196,7 @@ namespace Den.Tools
 			}
 
 
-			public GameObject InstantiateObject ()
+			public GameObject InstantiateObject (Transform parent=null)
 			{
 				GameObject gobj = null;
 			
@@ -205,11 +204,11 @@ namespace Den.Tools
 				if (!prototype.instantiateClones && 
 					!UnityEditor.EditorApplication.isPlaying && 
 					UnityEditor.PrefabUtility.GetPrefabAssetType(prototype.prefab)!=UnityEditor.PrefabAssetType.NotAPrefab)  //if not playing and prefab is prefab
-						gobj = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(prototype.prefab);
+						gobj = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(prototype.prefab, parent);
 				else
-						gobj = GameObject.Instantiate(prototype.prefab); 
+						gobj = GameObject.Instantiate(prototype.prefab, parent); 
 				#else
-				gobj = GameObject.Instantiate(prototype.prefab);
+				gobj = GameObject.Instantiate(prototype.prefab, parent);
 				#endif
 
 				return gobj;

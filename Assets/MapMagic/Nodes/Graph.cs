@@ -122,8 +122,11 @@ namespace MapMagic.Nodes
 			}
 
 
-			public void Remove (Group grp)
+			public void Remove (Auxiliary grp)
 			{
+				if (grp == null)
+					throw new Exception("Group to remove is null");
+
 				if (!ArrayTools.Contains(groups, grp))
 					throw new Exception("Could not remove group " + grp + " since it is not in graph");
 

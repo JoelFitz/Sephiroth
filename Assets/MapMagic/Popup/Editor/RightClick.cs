@@ -40,7 +40,7 @@ namespace MapMagic.Nodes.GUI
 		public static Item RightClickItems (UI ui, Vector2 mousePos, Graph graph)
 		{
 			ClickedNear (ui, mousePos, 
-				out Group clickedGroup, 
+				out Auxiliary clickedGroup, 
 				out Generator clickedGen, 
 				out IInlet<object> clickedLink, 
 				out IInlet<object> clickedInlet, 
@@ -69,7 +69,7 @@ namespace MapMagic.Nodes.GUI
 
 
 		public static bool ClickedNear (UI ui, Vector2 mousePos, 
-			out Group clickedGroup, 
+			out Auxiliary clickedGroup, 
 			out Generator clickedGen, 
 			out IInlet<object> clickedLink,
 			out IInlet<object> clickedInlet, 
@@ -95,7 +95,7 @@ namespace MapMagic.Nodes.GUI
 				//GeneratorDraw.genCellLut.TryGetValue(cell, out clickedGen);  //TryGet will overwrite to null if not found
 
 				if (ui.cellObjs.TryGetObject(cell, "Generator", out Generator gen)) clickedGen = gen;
-				if (ui.cellObjs.TryGetObject(cell, "Group", out Group group)) clickedGroup = group;
+				if (ui.cellObjs.TryGetObject(cell, "Group", out Auxiliary group)) clickedGroup = group;
 				if (ui.cellObjs.TryGetObject(cell, "Inlet", out IInlet<object> inlet)) clickedInlet = inlet;
 				if (ui.cellObjs.TryGetObject(cell, "Outlet", out IOutlet<object> outlet)) clickedOutlet = outlet;
 				if (ui.cellObjs.TryGetObject(cell, "Expose", out RightClickExpose field)) clickedExpose = field;
@@ -123,7 +123,7 @@ namespace MapMagic.Nodes.GUI
 		/// Returns the top clicked object (or null) in clickedGroup-to-clickedField priority
 		{
 			ClickedNear (ui, mousePos, 
-				out Group clickedGroup, out Generator clickedGen, out IInlet<object> clickedLink, out IInlet<object> clickedInlet, out IOutlet<object> clickedOutlet, out RightClickExpose clickedExpose);
+				out Auxiliary clickedGroup, out Generator clickedGen, out IInlet<object> clickedLink, out IInlet<object> clickedInlet, out IOutlet<object> clickedOutlet, out RightClickExpose clickedExpose);
 
 			if (clickedExpose != null) return clickedExpose;
 			if (clickedOutlet != null) return clickedOutlet;

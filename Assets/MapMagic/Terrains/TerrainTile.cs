@@ -626,7 +626,8 @@ namespace MapMagic.Terrains
 					//	CoroutineManager.Stop(draft.coroutines.Pop());
 
 					draft.generateStarted = true;
-					draft.applyReady = false;
+					if (!MapMagicObject.isPlaying)
+						draft.applyReady = false; //keeping old results applied on drafts until new ready to prevent them disappearing in playmode. It resets on move.
 					draft.generateReady = false;
 
 					EnqueueDraftTask(draft, graph, Priority+1000, "Draft");

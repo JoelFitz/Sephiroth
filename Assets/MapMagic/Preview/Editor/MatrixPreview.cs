@@ -195,7 +195,7 @@ namespace MapMagic.Previews
 			//	StopPreviewOnLoad stopScript = go.AddComponent<StopPreviewOnLoad>();
 			//	stopScript.active = true; 
 
-				previewTerrain.drawInstanced = terrain.drawInstanced; //set only if terrain data assigned
+				previewTerrain.drawInstanced = false; //preview shaders are all non-instanced //terrain.drawInstanced;
 				previewTerrain.heightmapPixelError = terrain.heightmapPixelError;
 				previewTerrain.drawTreesAndFoliage = false;
 				#if UNITY_2019_1_OR_NEWER

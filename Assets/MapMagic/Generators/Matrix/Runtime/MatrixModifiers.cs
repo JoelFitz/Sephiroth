@@ -293,6 +293,7 @@ namespace MapMagic.Nodes.MatrixGenerators
 				Blend(matrix, blendMatrix, layer.algorithm, layer.opacity);
 			}
 			
+			matrix.Clamp01();
 			data.StoreProduct(this, matrix);
 		}
 
@@ -408,6 +409,70 @@ namespace MapMagic.Nodes.MatrixGenerators
 			if (stop!=null && stop.stop) return;
 			for (int i=0; i<layers.Length; i++)
 				data.StoreProduct(layers[i], dstMatrices[i]);
+		}
+	}
+
+
+	[System.Serializable]
+	[GeneratorMenu (menu="Map/Modifiers", name ="Distort", iconName="GeneratorIcons/Distort", disengageable = true, 
+		helpLink = "https://gitlab.com/denispahunov/mapmagic/-/wikis/MatrixGenerators/Contrast")]
+	public class Distort219 : Generator, IInlet<MatrixWorld>, IMultiInlet, IOutlet<MatrixWorld> 
+	{
+		public override (string, int) GetCodeFileLine () => GetCodeFileLineBase();  //to get here with right-click on generator
+
+		[Val("Offset X", "Inlet")]	public readonly Inlet<MatrixWorld> xOffsetIn = new Inlet<MatrixWorld>();
+		[Val("Offset Z", "Inlet")]	public readonly Inlet<MatrixWorld> zOffsetIn = new Inlet<MatrixWorld>();
+		public IEnumerable<IInlet<object>> Inlets () { yield return xOffsetIn; yield return zOffsetIn; }
+
+		[Val(name="Intensity")] public float intensity = 0f;
+		[Val(name="Midpoint")] public float midpoint = 0.5f;
+
+		public override void Generate (TileData data, StopToken stop)
+		{
+			if (stop!=null && stop.stop) return;
+			MatrixWorld src = data.ReadInletProduct(this);
+			if (src == null) return; 
+			if (!enabled) { data.StoreProduct(this, src); return; }
+
+			if (stop!=null && stop.stop) return;
+			MatrixWorld xMask = data.ReadInletProduct(xOffsetIn);
+			MatrixWorld zMask = data.ReadInletProduct(zOffsetIn);
+
+			MatrixWorld dst = new MatrixWorld(src);
+			float worldIntensity = intensity / data.area.PixelSize.x;
+
+			if (xMask != null)
+				for (int x=0; x<src.rect.size.x; x++)
+					for (int z=0; z<src.rect.size.z; z++)
+					{
+						int i = z*xMask.rect.size.x + x;
+						float xOffset = (xMask.arr[i] - midpoint) * worldIntensity;
+						if (x+xOffset < 0)
+							xOffset = -x;
+						if (x+xOffset > src.rect.size.x-1)
+							xOffset = src.rect.size.x-1 - x;
+
+						float val = src.GetInterpolated(x+dst.rect.offset.x + xOffset, z+dst.rect.offset.z);
+						dst.arr[i] = val;
+					}
+
+			if (zMask != null)
+				for (int x=0; x<src.rect.size.x; x++)
+					for (int z=0; z<src.rect.size.z; z++)
+					{
+						int i = z*zMask.rect.size.x + x;
+						float zOffset = (zMask.arr[i] - midpoint) * worldIntensity;
+						if (z+zOffset < 0)
+							zOffset = -x;
+						if (z+zOffset > src.rect.size.z-1)
+							zOffset = src.rect.size.z-1 - z;
+
+						float val = src.GetInterpolated(x+dst.rect.offset.x, z+dst.rect.offset.z + zOffset);
+						dst.arr[i] = val;
+					}
+
+			if (stop!=null && stop.stop) return;
+			data.StoreProduct(this, dst);
 		}
 	}
 
@@ -587,9 +652,9 @@ namespace MapMagic.Nodes.MatrixGenerators
 		public Vector2 from = new Vector2(0.4f, 0.6f);
 		public Vector2 to = new Vector2(1f, 1f);
 
-		public float tFrom;
-		public float tTo;
-		public float tTransition;
+		public float tFrom = 0.4f;
+		public float tTo = 0.6f;
+		public float tTransition = 0.1f;
 		
 		public override void Generate (TileData data, StopToken stop)
 		{

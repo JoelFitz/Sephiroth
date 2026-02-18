@@ -361,7 +361,7 @@ namespace Den.Tools.GUI
 				if (type == typeof(int)) return Field((int)val);
 				else if (type == typeof(float)) return Field((float)val);
 				else if (type == typeof(bool)) return Toggle((bool)val);
-				else if (typeof(Enum).IsAssignableFrom(type)) return Field((Enum)val);
+				else if (typeof(Enum).IsAssignableFrom(type)) return Field((Enum)Enum.ToObject(type, val));
 				else if (type == typeof(string)) return Field((string)val);
 				else if (type == typeof(Color)) return Field((Color)val);
 				else if (type == typeof(double)) return Field((double)val);
@@ -375,7 +375,7 @@ namespace Den.Tools.GUI
 				else if (type == typeof(Coord3D)) return Field((Coord3D)val);
 				else if (type == typeof(Texture2D)) return Field((Texture2D)val, true);
 				else if (type == typeof(Transform)) return Field((Transform)val, true);
-				else if (type == typeof(GameObject)) return Field((Transform)val, true);
+				else if (type == typeof(GameObject)) return Field((GameObject)val, true);
 				else if (type == typeof(Material)) return Field((Material)val, true);
 				else if (typeof(UnityEngine.Object).IsAssignableFrom(type)) return ObjectField((UnityEngine.Object)val, type, true);
 				
@@ -390,7 +390,7 @@ namespace Den.Tools.GUI
 				if (type == typeof(int)) return Field((int)val, label);
 				else if (type == typeof(float)) return Field((float)val, label);
 				else if (type == typeof(bool)) return Toggle((bool)val, label);
-				else if (typeof(Enum).IsAssignableFrom(type)) return Field((Enum)val, label);
+				else if (typeof(Enum).IsAssignableFrom(type)) return Field((Enum)Enum.ToObject(type, val), label);
 				else if (type == typeof(string)) return Field((string)val, label);
 				else if (type == typeof(Color)) return Field((Color)val, label);
 				else if (type == typeof(double)) return Field((double)val, label);
@@ -404,7 +404,7 @@ namespace Den.Tools.GUI
 				else if (type == typeof(Coord3D)) return Field((Coord3D)val, label);
 				else if (type == typeof(Texture2D)) return Field((Texture2D)val, label, true);
 				else if (type == typeof(Transform)) return Field((Transform)val, label, true);
-				else if (type == typeof(GameObject)) return Field((Transform)val, label, true);
+				else if (type == typeof(GameObject)) return Field((GameObject)val, label, true);
 				else if (type == typeof(Material)) return Field((Material)val, label, true);
 				else if (type == typeof(TerrainLayer)) return Field((TerrainLayer)val, label, true);
 				else if (typeof(UnityEngine.Object).IsAssignableFrom(type)) return ObjectField((UnityEngine.Object)val, type, true);

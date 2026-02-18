@@ -148,6 +148,14 @@ namespace MapMagic.Nodes.GUI
 				}
 				else //RangeDet.Transition
 				{
+					//avoiding 0 at update
+					if (gen.tFrom==0  &&  gen.tTo==0  &&  gen.tTransition==0)
+					{
+						gen.tFrom = (gen.from.x + gen.from.y)/2;
+						gen.tTo = (gen.to.x + gen.to.y)/2;
+						gen.tTransition = (gen.from.y - gen.from.x);
+					}
+				
 					using (Cell.LineStd) 
 					{
 						Draw.Field(ref gen.tFrom, "From");
@@ -355,6 +363,7 @@ namespace MapMagic.Nodes.GUI
 						using (Cell.LineStd) grassOut.prototype.prototype = Draw.Field(grassOut.prototype.prototype, "Object");
 						grassOut.prototype.prototypeTexture = null; //otherwise this texture will be included to build even if not displayed
 						grassOut.prototype.usePrototypeMesh = true;
+						Cell.current.Expose(grassOut.id, "prototype", typeof(DetailPrototype));
 					}
 					else
 					{

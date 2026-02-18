@@ -19,7 +19,7 @@ namespace MapMagic.Nodes.GUI
 {
 	public static partial class ObjectsEditors
 	{
-		public static void DrawObjectPrefabs (ref GameObject[] prefabs, bool multiPrefab=true, bool treeIcon=false)
+		public static void DrawObjectPrefabs (ref GameObject[] prefabs, bool multiPrefab=true, bool treeIcon=false, ulong genId=0) //genId to expose
 		{
 			string iconName = treeIcon ?  "DPUI/Icons/TreeDisabled" : "DPUI/Icons/ObjectDisabled";
 
@@ -27,7 +27,7 @@ namespace MapMagic.Nodes.GUI
 				using (Cell.LineStd) 
 				{
 					GameObject[] prefabsCopy = prefabs; //TODO: Action not taking ref. The layer should have onDraw function as Action<layer,int>, instead of just <int>
-					LayersEditor.DrawLayers(ref prefabs, onDraw: n => DrawObjectPrefabLayer(prefabsCopy,n,iconName) );
+					LayersEditor.DrawLayers(ref prefabs, onDraw: n => DrawObjectPrefabLayer(prefabsCopy,n,iconName,genId) );
 				}
 			else
 			{
@@ -46,7 +46,7 @@ namespace MapMagic.Nodes.GUI
 			Cell.EmptyLinePx(2);
 		}
 
-		private static void DrawObjectPrefabLayer (GameObject[] prefabs, int n, string iconName)
+		private static void DrawObjectPrefabLayer (GameObject[] prefabs, int n, string iconName, ulong genId=0) //genId to expose
 		{ 
 			if (n>=prefabs.Length) return; //on layer remove
 			Cell.EmptyLinePx(4);
@@ -54,6 +54,7 @@ namespace MapMagic.Nodes.GUI
 			{
 				using (Cell.RowPx(24)) Draw.Icon( UI.current.textures.GetTexture(iconName) );
 				using (Cell.Row) prefabs[n] = Draw.ObjectField(prefabs[n]); 
+				Cell.current.Expose(genId, "prefabs", typeof(UnityEngine.Object), arrIndex:n);
 				Cell.EmptyRowPx(4);
 			}
 			Cell.EmptyLinePx(4);

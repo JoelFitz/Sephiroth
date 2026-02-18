@@ -19,7 +19,7 @@ namespace MapMagic.Nodes.GUI
 	{
 			private static GUIStyle itemTextStyle;
 
-			public static Item GroupItems (Vector2 mousePos, Group grp, Graph graph, int priority=3)
+			public static Item GroupItems (Vector2 mousePos, Auxiliary grp, Graph graph, int priority=3)
 			{
 				Item genItems = new Item("Group");
 				genItems.onDraw = RightClick.DrawItem;
@@ -103,12 +103,12 @@ namespace MapMagic.Nodes.GUI
 			}
 
 
-			public static void RemoveGroup (Group grp, Graph graph, bool withContent=false)
+			public static void RemoveGroup (Auxiliary grp, Graph graph, bool withContent=false)
 			{
 				GraphWindow.RecordCompleteUndo();
 
-				if (withContent)
-					GroupDraw.RemoveGroupContents(grp, graph);
+				if (withContent && grp is Group g)
+					GroupDraw.RemoveGroupContents(g, graph);
 
 				graph.Remove(grp);
 

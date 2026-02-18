@@ -904,7 +904,7 @@ namespace MapMagic.Nodes.GUI
 						//Vector2 mousePos = graphUI.scrollZoom.ToInternal(addDragTo + new Vector2(addDragSize/2,addDragSize/2)); //add button center
 
 						RightClick.ClickedNear (graphUI, mousePos, 
-							out Group clickedGroup, out Generator clickedGen, out IInlet<object> clickedLink, out IInlet<object> clickedInlet, out IOutlet<object> clickedOutlet, out RightClickExpose clickedField);
+							out Auxiliary clickedGroup, out Generator clickedGen, out IInlet<object> clickedLink, out IInlet<object> clickedInlet, out IOutlet<object> clickedOutlet, out RightClickExpose clickedField);
 
 						if (clickedOutlet != null)
 							CreateRightClick.DrawAppendItems(mousePos, graph, clickedOutlet);
