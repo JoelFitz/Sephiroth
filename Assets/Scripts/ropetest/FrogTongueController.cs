@@ -76,13 +76,51 @@ public class FrogTongueController : MonoBehaviour
 
     void SetupVisualTongue()
     {
+        // Remove existing LineRenderer if it exists
+        if (tongueRenderer != null)
+        {
+            DestroyImmediate(tongueRenderer);
+        }
+
         tongueRenderer = gameObject.AddComponent<LineRenderer>();
-        tongueRenderer.material = tongueMaterial;
+
+        // Essential LineRenderer settings
+        tongueRenderer.useWorldSpace = true;
         tongueRenderer.startWidth = tongueWidth;
         tongueRenderer.endWidth = tongueWidth * 0.7f; // Tapered tip
-        tongueRenderer.positionCount = 2; // Start with just anchor point
-        tongueRenderer.useWorldSpace = true;
+        tongueRenderer.positionCount = 0; // Start with no positions
+
+        // Material assignment with fallback
+        if (tongueMaterial != null)
+        {
+            tongueRenderer.material = tongueMaterial;
+            Debug.Log("Using provided tongue material");
+        }
+        else
+        {
+            // Create a default visible material
+            Debug.LogWarning("No tongue material assigned, creating default material");
+            Material defaultMat = new Material(Shader.Find("Sprites/Default"));
+            if (defaultMat.shader == null)
+            {
+                defaultMat = new Material(Shader.Find("Standard"));
+            }
+            defaultMat.color = Color.red; // Bright red for visibility
+            tongueRenderer.material = defaultMat;
+            tongueMaterial = defaultMat; // Store for future use
+        }
+
+        // Critical rendering settings
+        tongueRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        tongueRenderer.receiveShadows = false;
+        tongueRenderer.sortingOrder = 100; // Render on top
+
+        // Make sure it's enabled
+        tongueRenderer.enabled = true;
+
+        Debug.Log($"LineRenderer setup complete. Material: {tongueRenderer.material.name}, Enabled: {tongueRenderer.enabled}");
     }
+
 
     void CreateTongue()
     {
@@ -127,10 +165,46 @@ public class FrogTongueController : MonoBehaviour
 
     void ConfigureTonguePhysics(GameObject segment)
     {
-        int tongueLayer = LayerMask.NameToLayer("Rope"); // Reuse rope layer
+        int tongueLayer = LayerMask.NameToLayer("Rope");
         if (tongueLayer == -1) tongueLayer = 0;
         segment.layer = tongueLayer;
 
+        // Configure the LineRenderer on this segment
+        LineRenderer segmentLineRenderer = segment.GetComponent<LineRenderer>();
+        if (segmentLineRenderer != null)
+        {
+            // Set up the LineRenderer for this segment
+            segmentLineRenderer.useWorldSpace = true;
+            segmentLineRenderer.startWidth = tongueWidth;
+            segmentLineRenderer.endWidth = tongueWidth;
+            segmentLineRenderer.positionCount = 2; // Start and end point
+
+            // Use the tongue material
+            if (tongueMaterial != null)
+            {
+                segmentLineRenderer.material = tongueMaterial;
+            }
+            else
+            {
+                // Create default material
+                Material defaultMat = new Material(Shader.Find("Standard"));
+                defaultMat.color = Color.green;
+                segmentLineRenderer.material = defaultMat;
+            }
+
+            segmentLineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            segmentLineRenderer.receiveShadows = false;
+            segmentLineRenderer.sortingOrder = 100;
+
+            // Initially disable it
+            segmentLineRenderer.enabled = false;
+        }
+        else
+        {
+            Debug.LogWarning($"No LineRenderer found on segment {segment.name}");
+        }
+
+        // Add collider
         Collider segmentCollider = segment.GetComponent<Collider>();
         if (segmentCollider == null)
         {
@@ -147,6 +221,8 @@ public class FrogTongueController : MonoBehaviour
             Physics.IgnoreLayerCollision(tongueLayer, playerLayer, true);
         }
     }
+
+
 
     void Update()
     {
@@ -403,23 +479,72 @@ public class FrogTongueController : MonoBehaviour
 
     void UpdateVisualTongue()
     {
-        List<Vector3> positions = new List<Vector3>();
-        positions.Add(anchorObject.transform.position);
-
-        for (int i = 0; i < activeSegments && i < tongueSegmentObjects.Count; i++)
+        // Update individual segment LineRenderers
+        for (int i = 0; i < tongueSegmentObjects.Count; i++)
         {
-            if (tongueSegmentObjects[i].activeInHierarchy)
+            if (tongueSegmentObjects[i] != null)
             {
-                positions.Add(tongueSegmentObjects[i].transform.position);
+                LineRenderer segmentLineRenderer = tongueSegmentObjects[i].GetComponent<LineRenderer>();
+
+                if (segmentLineRenderer != null)
+                {
+                    bool isActive = i < activeSegments && tongueSegmentObjects[i].activeInHierarchy;
+                    segmentLineRenderer.enabled = isActive;
+
+                    if (isActive)
+                    {
+                        // Set the line from this segment to the next (or to anchor for first segment)
+                        Vector3 startPos, endPos;
+
+                        if (i == 0)
+                        {
+                            // First segment connects to anchor
+                            startPos = anchorObject.transform.position;
+                            endPos = tongueSegmentObjects[i].transform.position;
+                        }
+                        else
+                        {
+                            // Connect to previous segment
+                            startPos = tongueSegmentObjects[i - 1].transform.position;
+                            endPos = tongueSegmentObjects[i].transform.position;
+                        }
+
+                        segmentLineRenderer.positionCount = 2;
+                        segmentLineRenderer.SetPosition(0, startPos);
+                        segmentLineRenderer.SetPosition(1, endPos);
+                    }
+                }
+            }
+        }
+
+        // Also update the main LineRenderer for overall tongue visualization
+        List<Vector3> positions = new List<Vector3>();
+        if (activeSegments > 0)
+        {
+            positions.Add(anchorObject.transform.position);
+
+            for (int i = 0; i < activeSegments && i < tongueSegmentObjects.Count; i++)
+            {
+                if (tongueSegmentObjects[i].activeInHierarchy)
+                {
+                    positions.Add(tongueSegmentObjects[i].transform.position);
+                }
             }
         }
 
         tongueRenderer.positionCount = positions.Count;
-        if (positions.Count > 0)
+        if (positions.Count > 1)
         {
             tongueRenderer.SetPositions(positions.ToArray());
+            tongueRenderer.enabled = true;
+        }
+        else
+        {
+            tongueRenderer.enabled = false;
         }
     }
+
+
 
     void DestroyTongue()
     {

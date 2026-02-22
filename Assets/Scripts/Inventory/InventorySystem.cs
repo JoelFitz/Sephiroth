@@ -303,6 +303,93 @@ public class InventorySystem : MonoBehaviour
             dropButton.interactable = hasSelection && selectedItem.canDrop;
     }
 
+    /// <summary>
+    /// Check if the inventory contains an item with the specified name
+    /// </summary>
+    /// <param name="itemName">Name to search for (checks display name, mushroom type, and mushroom display name)</param>
+    /// <returns>True if item is found, false otherwise</returns>
+    public bool HasItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName) || inventory == null)
+            return false;
+
+        // Search through all items in the inventory
+        for (int x = 0; x < inventorySize.x; x++)
+        {
+            for (int y = 0; y < inventorySize.y; y++)
+            {
+                InventoryItem item = inventory.grid[x, y];
+                if (item != null)
+                {
+                    // Check against display name first
+                    if (item.displayName.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        return true;
+
+                    // Also check against mushroom type if it's a mushroom item
+                    if (item.mushroomData != null &&
+                        item.mushroomData.mushroomType.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        return true;
+
+                    // Also check against mushroom display name
+                    if (item.mushroomData != null &&
+                        item.mushroomData.displayName.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Check if the inventory contains at least the specified amount of an item
+    /// </summary>
+    /// <param name="itemName">Name to search for</param>
+    /// <param name="requiredAmount">Minimum amount required</param>
+    /// <returns>True if enough items are found, false otherwise</returns>
+    public bool HasItem(string itemName, int requiredAmount)
+    {
+        if (string.IsNullOrEmpty(itemName) || inventory == null || requiredAmount <= 0)
+            return false;
+
+        int totalFound = 0;
+
+        // Search through all items in the inventory and count matching items
+        for (int x = 0; x < inventorySize.x; x++)
+        {
+            for (int y = 0; y < inventorySize.y; y++)
+            {
+                InventoryItem item = inventory.grid[x, y];
+                if (item != null)
+                {
+                    bool isMatch = false;
+
+                    // Check against display name first
+                    if (item.displayName.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        isMatch = true;
+
+                    // Also check against mushroom type if it's a mushroom item
+                    if (!isMatch && item.mushroomData != null &&
+                        item.mushroomData.mushroomType.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        isMatch = true;
+
+                    // Also check against mushroom display name
+                    if (!isMatch && item.mushroomData != null &&
+                        item.mushroomData.displayName.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        isMatch = true;
+
+                    if (isMatch)
+                    {
+                        totalFound += item.currentStack;
+                        if (totalFound >= requiredAmount)
+                            return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+
     public void EquipSelectedItem()
     {
         if (selectedItem == null || !selectedItem.canEquip) return;

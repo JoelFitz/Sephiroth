@@ -195,7 +195,7 @@ public class TongueGrappleSystem : MonoBehaviour
         // Alternative: Find all GrappleZone components in range
         GrappleZone[] allZones = FindObjectsOfType<GrappleZone>();
 
-        Debug.Log($"Found {allZones.Length} total grapple zones in scene");
+        //Debug.Log($"Found {allZones.Length} total grapple zones in scene");
 
         GrappleZone bestZone = null;
         float bestScore = 0f;
@@ -206,31 +206,31 @@ public class TongueGrappleSystem : MonoBehaviour
 
             if (distance <= grappleRange)
             {
-                Debug.Log($"Zone {zone.name} is in range (distance: {distance})");
+                //Debug.Log($"Zone {zone.name} is in range (distance: {distance})");
 
                 if (zone.CanGrapple())
                 {
                     Vector3 directionToZone = (zone.transform.position - transform.position).normalized;
                     float dotProduct = Vector3.Dot(transform.forward, directionToZone);
 
-                    Debug.Log($"  - Dot product: {dotProduct}");
+                    //Debug.Log($"  - Dot product: {dotProduct}");
 
                     if (dotProduct > 0.3f) // More lenient facing requirement
                     {
                         float score = dotProduct / distance;
-                        Debug.Log($"  - Valid zone! Score: {score}");
+                        //Debug.Log($"  - Valid zone! Score: {score}");
 
                         if (score > bestScore)
                         {
                             bestScore = score;
                             bestZone = zone;
-                            Debug.Log($"  - New best zone: {zone.name}");
+                            //Debug.Log($"  - New best zone: {zone.name}");
                         }
                     }
                 }
                 else
                 {
-                    Debug.Log($"  - Zone {zone.name} cannot grapple");
+                    //Debug.Log($"  - Zone {zone.name} cannot grapple");
                 }
             }
         }
@@ -238,7 +238,7 @@ public class TongueGrappleSystem : MonoBehaviour
         if (currentGrappleZone != bestZone)
         {
             currentGrappleZone = bestZone;
-            Debug.Log($"Current grapple zone changed to: {(bestZone != null ? bestZone.name : "NULL")}");
+            //Debug.Log($"Current grapple zone changed to: {(bestZone != null ? bestZone.name : "NULL")}");
         }
     }
 

@@ -20,7 +20,7 @@ MonoBehaviour:
   hideSpeed: 2
   hideDepth: 1
   fleeSpeed: 7.41
-  mushroomPrefab: {fileID: 0}
+  mushroomPrefab: {fileID: 4952714688327844399, guid: 630941928679c7e46943cfd1efcf61e2, type: 3}
   collectionEffect: {fileID: 0}
   rustleSounds: []
   collectionSound: {fileID: 0}

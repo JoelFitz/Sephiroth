@@ -49,3 +49,8 @@ MonoBehaviour:
   fleeTime: 3
   fleeDistance: 12
   fleeDirectionUpdateRate: 0.2
+  groundOffset: 0.1
+  raycastDistance: 50
+  terrainLayerMask:
+    serializedVersion: 2
+    m_Bits: 8

@@ -287,6 +287,18 @@ public class MushroomAI : MonoBehaviour
 
     public void OnCollected()
     {
+        // Immediately hide the mushroom model to give instant feedback
+        if (mushroomModel != null)
+        {
+            mushroomModel.SetActive(false);
+        }
+
+        // Also hide the main collider so it can't be collected again
+        if (mushroomCollider != null)
+        {
+            mushroomCollider.enabled = false;
+        }
+
         // Add to inventory instead of just destroying
         if (InventorySystem.Instance != null)
         {
@@ -310,20 +322,32 @@ public class MushroomAI : MonoBehaviour
                     Instantiate(mushroomData.collectionEffect, transform.position, Quaternion.identity);
                 }
 
-                // Destroy mushroom
-                Destroy(gameObject, 0.1f);
+                // Destroy mushroom immediately (no delay)
+                Destroy(gameObject);
             }
             else
             {
                 Debug.Log("Inventory full! Mushroom dropped to ground.");
+
+                // Re-enable components if inventory is full
+                if (mushroomModel != null)
+                {
+                    mushroomModel.SetActive(true);
+                }
+                if (mushroomCollider != null)
+                {
+                    mushroomCollider.enabled = true;
+                }
+
                 // Convert to pickup instead of destroying
                 gameObject.AddComponent<MushroomPickup>().mushroomData = mushroomData;
             }
         }
         else
         {
-            // Fallback to original behavior
-            // Original OnCollected code here...
+            // Fallback - destroy immediately
+            Debug.LogWarning("InventorySystem not found! Destroying mushroom.");
+            Destroy(gameObject);
         }
     }
 
