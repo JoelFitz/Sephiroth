@@ -6244,7 +6244,7 @@ MonoBehaviour:
     cookingNotes: Cook for 20 minutes, serve with radish.
     illustration: {fileID: 0}
     isDiscovered: 1
-    timesCollected: 0
+    timesCollected: 2
     nameUnlockCount: 1
     habitatUnlockCount: 5
     cookingUnlockCount: 10
