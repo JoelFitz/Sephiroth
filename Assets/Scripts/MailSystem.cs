@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System;
+using UnityEngine.UI;
 
 [Serializable]
 public class MushroomQuest
@@ -26,31 +27,46 @@ public class MailSystem : MonoBehaviour
     [SerializeField] private MushroomQuest currentQuest;
 
     [Header("UI Settings")]
-    public GameObject mailUIPanel; // Add reference to mail UI panel
-    public KeyCode toggleMailKey = KeyCode.M; // Use M key for Mail
+    public GameObject mailUIPanel;
+    public KeyCode toggleMailKey = KeyCode.M;
     private bool isMailOpen = false;
+
+    public Button handInButton;
+
+    [Header("Reward Settings")]
+    [SerializeField] private int rewardPointsPerQuest = 100;
+    [SerializeField] private int totalUpgradePoints = 0;
 
     public static MailSystem Instance { get; private set; }
 
     public MushroomQuest CurrentQuest => currentQuest;
+    public int TotalUpgradePoints => totalUpgradePoints;
 
     public event Action<MushroomQuest> OnNewQuestReceived;
     public event Action<MushroomQuest> OnQuestCompleted;
     public event Action<string> OnMushroomCollected;
+
+    /// <summary>
+    /// Fired when a quest is ready to be handed in. UI should show the Hand In button.
+    /// </summary>
+    public event Action<MushroomQuest> OnQuestReadyToHandIn;
+
+    /// <summary>
+    /// Fired when a quest is successfully handed in. Passes points awarded.
+    /// </summary>
+    public event Action<int> OnQuestHandedIn;
 
     [Header("Daily Quest Settings")]
     public int questsPerDay = 2;
     public int minMushroomsPerQuest = 1;
     public int maxMushroomsPerQuest = 4;
 
-    // Available mushroom types for quest generation
     [SerializeField]
     private string[] availableMushroomTypes = {
-    "Chanterelle", "Shiitake", "Morel", "Oyster", "Porcini", "Enoki"
+        "Chanterelle", "Shiitake", "Morel", "Oyster", "Porcini", "Enoki"
     };
 
     private int currentDay = 1;
-
 
     void Awake()
     {
@@ -58,6 +74,11 @@ public class MailSystem : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            if (mailUIPanel != null)
+            {
+                DontDestroyOnLoad(mailUIPanel);
+            }
         }
         else
         {
@@ -67,17 +88,14 @@ public class MailSystem : MonoBehaviour
 
     void Start()
     {
-        // Hide mail UI by default
         if (mailUIPanel != null)
             mailUIPanel.SetActive(false);
 
-        // Start with a simple test quest but don't show UI
         GenerateTestQuest();
     }
 
     void Update()
     {
-        // Handle mail UI toggle
         if (Input.GetKeyDown(toggleMailKey))
         {
             ToggleMailUI();
@@ -91,7 +109,22 @@ public class MailSystem : MonoBehaviour
         if (mailUIPanel != null)
             mailUIPanel.SetActive(isMailOpen);
 
-        Debug.Log(isMailOpen ? "📬 Mail opened!" : "📬 Mail closed!");
+        // FIX: Refresh UI content whenever the mail panel is opened
+        if (isMailOpen)
+        {
+            var listUI = FindObjectOfType<MushroomListUI>();
+            if (listUI != null)
+                listUI.Refresh();
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        } else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+            Debug.Log(isMailOpen ? "📬 Mail opened!" : "📬 Mail closed!");
     }
 
     void GenerateTestQuest()
@@ -102,7 +135,6 @@ public class MailSystem : MonoBehaviour
             questTitle = "Morning Foraging Order",
             requestedMushrooms = new List<MushroomRequest>
             {
-                new MushroomRequest { mushroomType = "Chanterelle", quantity = 3, collectedQuantity = 0 },
                 new MushroomRequest { mushroomType = "Shiitake", quantity = 2, collectedQuantity = 0 }
             },
             deadline = DateTime.Now.AddMinutes(10),
@@ -118,7 +150,6 @@ public class MailSystem : MonoBehaviour
         currentQuest = quest;
         OnNewQuestReceived?.Invoke(quest);
 
-        // Don't automatically show UI, just refresh if it's open
         if (isMailOpen)
         {
             FindObjectOfType<MushroomListUI>()?.Refresh();
@@ -138,7 +169,6 @@ public class MailSystem : MonoBehaviour
             CheckQuestCompletion();
         }
 
-        // Fire event for research book
         OnMushroomCollected?.Invoke(mushroomType);
     }
 
@@ -146,37 +176,71 @@ public class MailSystem : MonoBehaviour
     {
         if (currentQuest == null) return;
 
-        bool allCompleted = currentQuest.requestedMushrooms.TrueForAll(r => r.collectedQuantity >= r.quantity);
+        bool allCompleted = currentQuest.requestedMushrooms.TrueForAll(
+            r => r.collectedQuantity >= r.quantity);
 
         if (allCompleted && !currentQuest.isCompleted)
         {
             currentQuest.isCompleted = true;
             OnQuestCompleted?.Invoke(currentQuest);
-            Debug.Log($"Quest completed: {currentQuest.questTitle}");
+
+            // Fire the hand-in event so the UI can show the button
+            OnQuestReadyToHandIn?.Invoke(currentQuest);
+
+            // If mail is open, refresh so the hand-in button appears immediately
+            if (isMailOpen)
+                FindObjectOfType<MushroomListUI>()?.Refresh();
+
+            Debug.Log($"✅ Quest complete and ready to hand in: {currentQuest.questTitle}");
         }
     }
 
     /// <summary>
-    /// Start a new day - clear old quests and generate new ones
+    /// Called when the player clicks the Hand In button.
+    /// Awards upgrade points and removes the quest.
+    /// </summary>
+    public void HandInCurrentQuest()
+    {
+        if (currentQuest == null || !currentQuest.isCompleted)
+        {
+            Debug.LogWarning("No completed quest to hand in.");
+            return;
+        }
+
+        // Award points
+        totalUpgradePoints += rewardPointsPerQuest;
+        OnQuestHandedIn?.Invoke(rewardPointsPerQuest);
+
+        Debug.Log($"🏆 Quest handed in: {currentQuest.questTitle} | +" +
+                  $"{rewardPointsPerQuest} pts | Total: {totalUpgradePoints} pts");
+
+        // Remove the handed-in quest
+        activeQuests.Remove(currentQuest);
+        currentQuest = null;
+
+        // Set the next active quest if one exists
+        if (activeQuests.Count > 0)
+            currentQuest = activeQuests[0];
+
+        // Refresh UI
+        if (isMailOpen)
+            FindObjectOfType<MushroomListUI>()?.Refresh();
+    }
+
+    /// <summary>
+    /// Start a new day — clears old quests and generates new ones.
+    /// Call this from your sleep/day-cycle system.
     /// </summary>
     public void StartNewDay()
     {
         currentDay++;
         Debug.Log($"🌅 Day {currentDay} begins!");
 
-        // Clear old quests
         ClearOldQuests();
-
-        // Generate new daily quests
         GenerateDailyQuests();
-
-        // Notify UI to refresh
         RefreshUI();
     }
 
-    /// <summary>
-    /// Clear all active quests
-    /// </summary>
     private void ClearOldQuests()
     {
         activeQuests.Clear();
@@ -184,9 +248,6 @@ public class MailSystem : MonoBehaviour
         Debug.Log("🗑️ Cleared old quests");
     }
 
-    /// <summary>
-    /// Generate new quests for the day
-    /// </summary>
     private void GenerateDailyQuests()
     {
         for (int i = 0; i < questsPerDay; i++)
@@ -198,9 +259,6 @@ public class MailSystem : MonoBehaviour
         Debug.Log($"📬 Generated {questsPerDay} new quests for day {currentDay}");
     }
 
-    /// <summary>
-    /// Generate a single random quest
-    /// </summary>
     private MushroomQuest GenerateRandomQuest(int questNumber)
     {
         var quest = new MushroomQuest
@@ -208,12 +266,12 @@ public class MailSystem : MonoBehaviour
             questId = $"DAY{currentDay}_QUEST_{questNumber:D3}",
             questTitle = GetRandomQuestTitle(),
             requestedMushrooms = new List<MushroomRequest>(),
-            deadline = DateTime.Now.AddMinutes(UnityEngine.Random.Range(15, 45)), // 15-45 minute deadlines
+            deadline = DateTime.Now.AddMinutes(UnityEngine.Random.Range(15, 45)),
             isCompleted = false
         };
 
-        // Generate 1-4 different mushroom requests per quest
-        int numDifferentMushrooms = UnityEngine.Random.Range(minMushroomsPerQuest, maxMushroomsPerQuest + 1);
+        int numDifferentMushrooms = UnityEngine.Random.Range(
+            minMushroomsPerQuest, maxMushroomsPerQuest + 1);
         var usedTypes = new List<string>();
 
         for (int i = 0; i < numDifferentMushrooms; i++)
@@ -221,86 +279,53 @@ public class MailSystem : MonoBehaviour
             string mushroomType;
             do
             {
-                mushroomType = availableMushroomTypes[UnityEngine.Random.Range(0, availableMushroomTypes.Length)];
+                mushroomType = availableMushroomTypes[
+                    UnityEngine.Random.Range(0, availableMushroomTypes.Length)];
             }
-            while (usedTypes.Contains(mushroomType)); // Avoid duplicates
+            while (usedTypes.Contains(mushroomType));
 
             usedTypes.Add(mushroomType);
 
-            var request = new MushroomRequest
+            quest.requestedMushrooms.Add(new MushroomRequest
             {
                 mushroomType = mushroomType,
-                quantity = UnityEngine.Random.Range(1, 5), // 1-4 of each type
+                quantity = UnityEngine.Random.Range(1, 5),
                 collectedQuantity = 0
-            };
-
-            quest.requestedMushrooms.Add(request);
+            });
         }
 
         return quest;
     }
 
-    /// <summary>
-    /// Get a random quest title
-    /// </summary>
     private string GetRandomQuestTitle()
     {
         string[] titles = {
-        "Morning Foraging Order",
-        "Special Mushroom Request",
-        "Daily Harvest Task",
-        "Forest Bounty Collection",
-        "Mushroom Delivery Service",
-        "Nature's Grocery List",
-        "Woodland Treasure Hunt",
-        "Fungi Gathering Mission",
-        "Fresh Harvest Request",
-        "Seasonal Mushroom Order"
-    };
+            "Morning Foraging Order",
+            "Special Mushroom Request",
+            "Daily Harvest Task",
+            "Forest Bounty Collection",
+            "Mushroom Delivery Service",
+            "Nature's Grocery List",
+            "Woodland Treasure Hunt",
+            "Fungi Gathering Mission",
+            "Fresh Harvest Request",
+            "Seasonal Mushroom Order"
+        };
 
         return titles[UnityEngine.Random.Range(0, titles.Length)];
     }
 
-    /// <summary>
-    /// Refresh all UI elements
-    /// </summary>
     private void RefreshUI()
     {
-        // Refresh mushroom list UI
         var mushroomListUI = FindObjectOfType<MushroomListUI>();
         if (mushroomListUI != null)
             mushroomListUI.Refresh();
 
-        // If mail is open, keep it open to show new quests
         if (isMailOpen && mailUIPanel != null)
-        {
-            // You might want to add a special "new day" notification here
             Debug.Log("📬 New quests available! Check your mail.");
-        }
     }
 
-    /// <summary>
-    /// Get the current day number
-    /// </summary>
-    public int GetCurrentDay()
-    {
-        return currentDay;
-    }
-
-    /// <summary>
-    /// Get total number of active quests
-    /// </summary>
-    public int GetActiveQuestCount()
-    {
-        return activeQuests.Count;
-    }
-
-    /// <summary>
-    /// Get completed quests count
-    /// </summary>
-    public int GetCompletedQuestCount()
-    {
-        return activeQuests.FindAll(q => q.isCompleted).Count;
-    }
+    public int GetCurrentDay() => currentDay;
+    public int GetActiveQuestCount() => activeQuests.Count;
+    public int GetCompletedQuestCount() => activeQuests.FindAll(q => q.isCompleted).Count;
 }
-

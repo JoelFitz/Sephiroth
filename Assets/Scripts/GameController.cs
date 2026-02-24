@@ -21,6 +21,9 @@ public class GameController : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            if (questUI != null)
+                DontDestroyOnLoad(questUI);
         }
         else
         {

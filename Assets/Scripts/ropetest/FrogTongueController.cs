@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class FrogTongueController : MonoBehaviour
@@ -12,7 +12,7 @@ public class FrogTongueController : MonoBehaviour
     [Header("Tongue Mechanics")]
     public float extendSpeed = 25f;
     public float retractSpeed = 8f;
-    public float maxTongueLength = 6f; 
+    public float maxTongueLength = 6f;
     public float attachRange = 0.8f;
     public LayerMask catchableLayer = 1;
 
@@ -59,11 +59,9 @@ public class FrogTongueController : MonoBehaviour
 
     void SetupTongueAnchor()
     {
-        // Create invisible anchor point at frog's mouth
         anchorObject = new GameObject("TongueAnchor");
         anchorObject.transform.SetParent(transform);
 
-        // Position anchor at frog's mouth level
         if (tongueAnchor != null)
             anchorObject.transform.position = tongueAnchor.position;
         else
@@ -76,55 +74,38 @@ public class FrogTongueController : MonoBehaviour
 
     void SetupVisualTongue()
     {
-        // Remove existing LineRenderer if it exists
         if (tongueRenderer != null)
-        {
             DestroyImmediate(tongueRenderer);
-        }
 
         tongueRenderer = gameObject.AddComponent<LineRenderer>();
-
-        // Essential LineRenderer settings
         tongueRenderer.useWorldSpace = true;
         tongueRenderer.startWidth = tongueWidth;
-        tongueRenderer.endWidth = tongueWidth * 0.7f; // Tapered tip
-        tongueRenderer.positionCount = 0; // Start with no positions
+        tongueRenderer.endWidth = tongueWidth * 0.7f;
+        tongueRenderer.positionCount = 0;
 
-        // Material assignment with fallback
         if (tongueMaterial != null)
         {
             tongueRenderer.material = tongueMaterial;
-            Debug.Log("Using provided tongue material");
         }
         else
         {
-            // Create a default visible material
             Debug.LogWarning("No tongue material assigned, creating default material");
             Material defaultMat = new Material(Shader.Find("Sprites/Default"));
             if (defaultMat.shader == null)
-            {
                 defaultMat = new Material(Shader.Find("Standard"));
-            }
-            defaultMat.color = Color.red; // Bright red for visibility
+            defaultMat.color = Color.red;
             tongueRenderer.material = defaultMat;
-            tongueMaterial = defaultMat; // Store for future use
+            tongueMaterial = defaultMat;
         }
 
-        // Critical rendering settings
         tongueRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         tongueRenderer.receiveShadows = false;
-        tongueRenderer.sortingOrder = 100; // Render on top
-
-        // Make sure it's enabled
+        tongueRenderer.sortingOrder = 100;
         tongueRenderer.enabled = true;
-
-        Debug.Log($"LineRenderer setup complete. Material: {tongueRenderer.material.name}, Enabled: {tongueRenderer.enabled}");
     }
-
 
     void CreateTongue()
     {
-        // Clear any existing tongue segments
         DestroyTongue();
         currentTongueLength = 0f;
         activeSegments = 0;
@@ -133,9 +114,7 @@ public class FrogTongueController : MonoBehaviour
 
         for (int i = 0; i < tongueSegments; i++)
         {
-            // Create segment at anchor initially (all retracted)
             GameObject segment = Instantiate(tongueSegmentPrefab, startPos, Quaternion.identity);
-
             ConfigureTonguePhysics(segment);
 
             RopeSegment tongueScript = segment.GetComponent<RopeSegment>();
@@ -145,11 +124,8 @@ public class FrogTongueController : MonoBehaviour
             tongueSegmentObjects.Add(segment);
             tongueSegmentScripts.Add(tongueScript);
 
-            // Connect segments
             if (i == 0)
-            {
                 tongueScript.ConnectToSegment(anchorRigidbody, springForce, springDamper);
-            }
             else
             {
                 Rigidbody previousRb = tongueSegmentObjects[i - 1].GetComponent<Rigidbody>();
@@ -157,8 +133,6 @@ public class FrogTongueController : MonoBehaviour
             }
 
             tongueScript.SetJointDistance(segmentLength);
-
-            // Initially disable segments (tongue retracted)
             segment.SetActive(false);
         }
     }
@@ -169,24 +143,18 @@ public class FrogTongueController : MonoBehaviour
         if (tongueLayer == -1) tongueLayer = 0;
         segment.layer = tongueLayer;
 
-        // Configure the LineRenderer on this segment
         LineRenderer segmentLineRenderer = segment.GetComponent<LineRenderer>();
         if (segmentLineRenderer != null)
         {
-            // Set up the LineRenderer for this segment
             segmentLineRenderer.useWorldSpace = true;
             segmentLineRenderer.startWidth = tongueWidth;
             segmentLineRenderer.endWidth = tongueWidth;
-            segmentLineRenderer.positionCount = 2; // Start and end point
+            segmentLineRenderer.positionCount = 2;
 
-            // Use the tongue material
             if (tongueMaterial != null)
-            {
                 segmentLineRenderer.material = tongueMaterial;
-            }
             else
             {
-                // Create default material
                 Material defaultMat = new Material(Shader.Find("Standard"));
                 defaultMat.color = Color.green;
                 segmentLineRenderer.material = defaultMat;
@@ -195,16 +163,9 @@ public class FrogTongueController : MonoBehaviour
             segmentLineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             segmentLineRenderer.receiveShadows = false;
             segmentLineRenderer.sortingOrder = 100;
-
-            // Initially disable it
             segmentLineRenderer.enabled = false;
         }
-        else
-        {
-            Debug.LogWarning($"No LineRenderer found on segment {segment.name}");
-        }
 
-        // Add collider
         Collider segmentCollider = segment.GetComponent<Collider>();
         if (segmentCollider == null)
         {
@@ -214,15 +175,10 @@ public class FrogTongueController : MonoBehaviour
             cap.isTrigger = false;
         }
 
-        // Ignore collisions with player
         int playerLayer = LayerMask.NameToLayer("Player");
         if (playerLayer != -1)
-        {
             Physics.IgnoreLayerCollision(tongueLayer, playerLayer, true);
-        }
     }
-
-
 
     void Update()
     {
@@ -242,24 +198,16 @@ public class FrogTongueController : MonoBehaviour
 
     void HandleInput()
     {
-        // Extend tongue in direction player is facing
         if (Input.GetKeyDown(extendKey) && currentState == TongueState.Retracted)
-        {
             ExtendTongue();
-        }
 
-        // Grab mushroom when it's close enough
         if (Input.GetKeyDown(grabKey) && currentState == TongueState.Attached)
-        {
             GrabAttachedTarget();
-        }
     }
 
     void ExtendTongue()
     {
         currentState = TongueState.Extending;
-
-        // Tongue extends in the direction the player is facing
         tongueDirection = playerTransform.forward;
         currentTongueLength = 0f;
         activeSegments = 0;
@@ -274,11 +222,9 @@ public class FrogTongueController : MonoBehaviour
             case TongueState.Extending:
                 HandleTongueExtension();
                 break;
-
             case TongueState.Attached:
                 HandleAttachedState();
                 break;
-
             case TongueState.Retracting:
                 HandleTongueRetraction();
                 break;
@@ -287,29 +233,25 @@ public class FrogTongueController : MonoBehaviour
 
     void HandleTongueExtension()
     {
-        // Rapidly extend tongue
         currentTongueLength += extendSpeed * Time.deltaTime;
 
-        int segmentsNeeded = Mathf.Min(Mathf.FloorToInt(currentTongueLength / segmentLength), tongueSegments);
+        int segmentsNeeded = Mathf.Min(
+            Mathf.FloorToInt(currentTongueLength / segmentLength), tongueSegments);
 
-        // Activate segments as tongue extends
         for (int i = activeSegments; i < segmentsNeeded; i++)
         {
             if (i < tongueSegmentObjects.Count)
             {
                 tongueSegmentObjects[i].SetActive(true);
-
-                // Position segment along tongue direction
-                Vector3 segmentPos = anchorObject.transform.position + tongueDirection * (i + 1) * segmentLength;
+                Vector3 segmentPos = anchorObject.transform.position +
+                                     tongueDirection * (i + 1) * segmentLength;
                 tongueSegmentObjects[i].transform.position = segmentPos;
             }
         }
         activeSegments = segmentsNeeded;
 
-        // Check for target hit
         CheckForTargetHit();
 
-        // Stop extending at max length
         if (currentTongueLength >= maxTongueLength)
         {
             currentState = TongueState.Retracting;
@@ -321,16 +263,16 @@ public class FrogTongueController : MonoBehaviour
     {
         if (activeSegments > 0)
         {
-            Vector3 tongueEnd = anchorObject.transform.position + tongueDirection * currentTongueLength;
+            Vector3 tongueEnd = anchorObject.transform.position +
+                                tongueDirection * currentTongueLength;
 
             Collider[] nearbyObjects = Physics.OverlapSphere(tongueEnd, attachRange, catchableLayer);
-
             foreach (var obj in nearbyObjects)
             {
                 MushroomAI mushroom = obj.GetComponent<MushroomAI>();
                 if (mushroom != null && !mushroom.IsTongueGrabbed())
                 {
-                    AttachToTarget(obj.gameObject);
+                    AttachToTarget(mushroom.gameObject);
                     return;
                 }
             }
@@ -343,14 +285,12 @@ public class FrogTongueController : MonoBehaviour
         attachedMushroomAI = target.GetComponent<MushroomAI>();
         currentState = TongueState.Attached;
 
-        // Put mushroom in TongueGrabbed state
         if (attachedMushroomAI != null)
         {
             attachedMushroomAI.SetTongueGrabbed(true);
             Debug.Log($"Mushroom {target.name} is now tongue-grabbed!");
         }
 
-        // springwrap
         if (activeSegments > 0)
         {
             GameObject tongueTip = tongueSegmentObjects[activeSegments - 1];
@@ -378,10 +318,6 @@ public class FrogTongueController : MonoBehaviour
             return;
         }
 
-        // tongue extend and maintain tension
-        // todo todo
-
-        // Slowly reel in the target using the spring joint tension
         if (attachmentJoint != null && activeSegments > 0)
         {
             for (int i = activeSegments - 1; i >= 0; i--)
@@ -391,21 +327,20 @@ public class FrogTongueController : MonoBehaviour
                     Rigidbody segmentRb = tongueSegmentObjects[i].GetComponent<Rigidbody>();
                     if (segmentRb != null)
                     {
-                        Vector3 directionToAnchor = (anchorObject.transform.position - segmentRb.position).normalized;
+                        Vector3 directionToAnchor =
+                            (anchorObject.transform.position - segmentRb.position).normalized;
                         segmentRb.AddForce(directionToAnchor * retractSpeed * 0.5f, ForceMode.Force);
                     }
                 }
             }
         }
 
-        // Check if target is close enough to grab
         if (attachedTarget != null)
         {
-            float distanceToPlayer = Vector3.Distance(attachedTarget.transform.position, transform.position);
+            float distanceToPlayer = Vector3.Distance(
+                attachedTarget.transform.position, transform.position);
             if (distanceToPlayer < 2f)
-            {
                 Debug.Log("Mushroom is close! Press E to grab it.");
-            }
         }
     }
 
@@ -414,17 +349,12 @@ public class FrogTongueController : MonoBehaviour
         if (attachedTarget != null)
         {
             Debug.Log($"Grabbed {attachedTarget.name}!");
-
-            // Trigger mushroom collection
             if (attachedMushroomAI != null)
-            {
                 attachedMushroomAI.ChangeState(MushroomState.Collected);
-            }
 
             ReleaseMushroom();
         }
 
-        // Start retracting tongue
         currentState = TongueState.Retracting;
     }
 
@@ -448,26 +378,49 @@ public class FrogTongueController : MonoBehaviour
     void HandleTongueRetraction()
     {
         if (attachedTarget != null)
-        {
             ReleaseMushroom();
-        }
 
-        // retract tongue
         currentTongueLength -= retractSpeed * 3f * Time.deltaTime;
 
-        int segmentsNeeded = Mathf.Max(0, Mathf.FloorToInt(currentTongueLength / segmentLength));
+        int segmentsNeeded = Mathf.Max(
+            0, Mathf.FloorToInt(currentTongueLength / segmentLength));
 
-        // Deactivate segments as tongue retracts
+        for (int i = 0; i < segmentsNeeded; i++)
+        {
+            if (tongueSegmentObjects[i] != null)
+            {
+                // Reposition each segment so its place in the chain reflects the
+                // current (shrinking) tongue length, not its original extend position.
+                Vector3 targetPos = anchorObject.transform.position +
+                                    tongueDirection * (i + 1) * segmentLength;
+
+                Rigidbody segmentRb = tongueSegmentObjects[i].GetComponent<Rigidbody>();
+                if (segmentRb != null)
+                {
+                    // MovePosition respects physics interpolation and looks smooth.
+                    segmentRb.MovePosition(Vector3.MoveTowards(
+                        segmentRb.position,
+                        targetPos,
+                        retractSpeed * 3f * Time.deltaTime));
+                }
+                else
+                {
+                    tongueSegmentObjects[i].transform.position = Vector3.MoveTowards(
+                        tongueSegmentObjects[i].transform.position,
+                        targetPos,
+                        retractSpeed * 3f * Time.deltaTime);
+                }
+            }
+        }
+
+        // Deactivate segments that are no longer part of the tongue length
         for (int i = activeSegments - 1; i >= segmentsNeeded; i--)
         {
             if (i >= 0 && i < tongueSegmentObjects.Count)
-            {
                 tongueSegmentObjects[i].SetActive(false);
-            }
         }
         activeSegments = segmentsNeeded;
 
-        // Fully retracted
         if (currentTongueLength <= 0)
         {
             currentState = TongueState.Retracted;
@@ -479,56 +432,36 @@ public class FrogTongueController : MonoBehaviour
 
     void UpdateVisualTongue()
     {
-        // Update individual segment LineRenderers
         for (int i = 0; i < tongueSegmentObjects.Count; i++)
         {
-            if (tongueSegmentObjects[i] != null)
+            if (tongueSegmentObjects[i] == null) continue;
+
+            LineRenderer segmentLR = tongueSegmentObjects[i].GetComponent<LineRenderer>();
+            if (segmentLR == null) continue;
+
+            bool isActive = i < activeSegments && tongueSegmentObjects[i].activeInHierarchy;
+            segmentLR.enabled = isActive;
+
+            if (isActive)
             {
-                LineRenderer segmentLineRenderer = tongueSegmentObjects[i].GetComponent<LineRenderer>();
+                Vector3 startPos = i == 0
+                    ? anchorObject.transform.position
+                    : tongueSegmentObjects[i - 1].transform.position;
 
-                if (segmentLineRenderer != null)
-                {
-                    bool isActive = i < activeSegments && tongueSegmentObjects[i].activeInHierarchy;
-                    segmentLineRenderer.enabled = isActive;
-
-                    if (isActive)
-                    {
-                        // Set the line from this segment to the next (or to anchor for first segment)
-                        Vector3 startPos, endPos;
-
-                        if (i == 0)
-                        {
-                            // First segment connects to anchor
-                            startPos = anchorObject.transform.position;
-                            endPos = tongueSegmentObjects[i].transform.position;
-                        }
-                        else
-                        {
-                            // Connect to previous segment
-                            startPos = tongueSegmentObjects[i - 1].transform.position;
-                            endPos = tongueSegmentObjects[i].transform.position;
-                        }
-
-                        segmentLineRenderer.positionCount = 2;
-                        segmentLineRenderer.SetPosition(0, startPos);
-                        segmentLineRenderer.SetPosition(1, endPos);
-                    }
-                }
+                segmentLR.positionCount = 2;
+                segmentLR.SetPosition(0, startPos);
+                segmentLR.SetPosition(1, tongueSegmentObjects[i].transform.position);
             }
         }
 
-        // Also update the main LineRenderer for overall tongue visualization
         List<Vector3> positions = new List<Vector3>();
         if (activeSegments > 0)
         {
             positions.Add(anchorObject.transform.position);
-
             for (int i = 0; i < activeSegments && i < tongueSegmentObjects.Count; i++)
             {
                 if (tongueSegmentObjects[i].activeInHierarchy)
-                {
                     positions.Add(tongueSegmentObjects[i].transform.position);
-                }
             }
         }
 
@@ -544,8 +477,6 @@ public class FrogTongueController : MonoBehaviour
         }
     }
 
-
-
     void DestroyTongue()
     {
         foreach (var segment in tongueSegmentObjects)
@@ -553,7 +484,6 @@ public class FrogTongueController : MonoBehaviour
             if (segment != null)
                 Destroy(segment);
         }
-
         tongueSegmentObjects.Clear();
         tongueSegmentScripts.Clear();
     }
@@ -561,16 +491,13 @@ public class FrogTongueController : MonoBehaviour
     void OnDestroy()
     {
         if (attachedTarget != null)
-        {
             ReleaseMushroom();
-        }
 
         DestroyTongue();
         if (anchorObject != null)
             Destroy(anchorObject);
     }
 
-    // debuyg
     void OnDrawGizmos()
     {
         if (currentState == TongueState.Extending || currentState == TongueState.Attached)

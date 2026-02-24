@@ -1,13 +1,14 @@
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
+using UnityEngine.UI;
 
 public class MushroomListUI : MonoBehaviour
 {
     public GameObject mushroomEntryPrefab;
-    public Transform listContainer;       
+    public Transform listContainer;
     public TextMeshProUGUI questTitleText;
-
+    public Button handInButton;
 
     private List<GameObject> spawnedEntries = new List<GameObject>();
 
@@ -17,6 +18,7 @@ public class MushroomListUI : MonoBehaviour
         {
             MailSystem.Instance.OnNewQuestReceived += UpdateList;
             MailSystem.Instance.OnQuestCompleted += UpdateList;
+            MailSystem.Instance.OnQuestReadyToHandIn += UpdateList;
             UpdateList(MailSystem.Instance.CurrentQuest);
         }
     }
@@ -27,6 +29,7 @@ public class MushroomListUI : MonoBehaviour
         {
             MailSystem.Instance.OnNewQuestReceived -= UpdateList;
             MailSystem.Instance.OnQuestCompleted -= UpdateList;
+            MailSystem.Instance.OnQuestReadyToHandIn -= UpdateList;
         }
     }
 
@@ -35,6 +38,10 @@ public class MushroomListUI : MonoBehaviour
         // Update quest title
         if (questTitleText != null)
             questTitleText.text = quest != null ? quest.questTitle : "";
+
+        // Show hand-in button only when the quest is fully completed
+        if (handInButton != null)
+            handInButton.gameObject.SetActive(quest != null && quest.isCompleted);
 
         // Clear old entries
         foreach (var entry in spawnedEntries)
@@ -55,6 +62,6 @@ public class MushroomListUI : MonoBehaviour
 
     public void Refresh()
     {
-        UpdateList(MailSystem.Instance.CurrentQuest);
+        UpdateList(MailSystem.Instance?.CurrentQuest);
     }
 }

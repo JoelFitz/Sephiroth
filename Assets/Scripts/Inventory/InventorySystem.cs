@@ -403,12 +403,9 @@ public class InventorySystem : MonoBehaviour
     {
         if (selectedItem == null || !selectedItem.canEat) return;
 
-        // Apply mushroom effects here (healing, buffs, etc.)
         ApplyMushroomEffects(selectedItem);
 
-        // Consume one from stack
         selectedItem.currentStack--;
-
         if (selectedItem.currentStack <= 0)
         {
             inventory.RemoveItem(selectedItem);
@@ -420,6 +417,38 @@ public class InventorySystem : MonoBehaviour
         OnItemUsed?.Invoke(selectedItem);
 
         Debug.Log($"🍄 Ate {selectedItem.displayName}!");
+    }
+
+    void ApplyMushroomEffects(InventoryItem item)
+    {
+        switch (item.mushroomData.rarity)
+        {
+            case MushroomRarity.Common:
+                Debug.Log("🔋 Restored small amount of health!");
+                break;
+            case MushroomRarity.Uncommon:
+                Debug.Log("🔋 Restored medium amount of health!");
+                break;
+            case MushroomRarity.Rare:
+                Debug.Log("🔋 Restored large amount of health!");
+                break;
+            case MushroomRarity.Epic:
+                Debug.Log("⚡ Gained speed boost!");
+                break;
+            case MushroomRarity.Legendary:
+                Debug.Log("✨ Gained mysterious power!");
+                break;
+        }
+
+        // Trigger psychedelic effect for Shiitake specifically
+        if (item.mushroomData != null &&
+            item.mushroomData.mushroomType.Equals("Shiitake", System.StringComparison.OrdinalIgnoreCase))
+        {
+            if (PsychedelicEffect.Instance != null)
+                PsychedelicEffect.Instance.Play();
+            else
+                Debug.LogWarning("PsychedelicEffect not found in scene. Add it to a persistent GameObject.");
+        }
     }
 
     public void DropSelectedItem()
@@ -442,34 +471,6 @@ public class InventorySystem : MonoBehaviour
         OnItemRemoved?.Invoke(selectedItem);
 
         Debug.Log($"📤 Dropped {selectedItem.displayName}!");
-    }
-
-    void ApplyMushroomEffects(InventoryItem item)
-    {
-        // Different mushrooms could have different effects
-        switch (item.mushroomData.rarity)
-        {
-            case MushroomRarity.Common:
-                // Small health restore
-                Debug.Log("🔋 Restored small amount of health!");
-                break;
-            case MushroomRarity.Uncommon:
-                // Medium health restore
-                Debug.Log("🔋 Restored medium amount of health!");
-                break;
-            case MushroomRarity.Rare:
-                // Large health restore or buff
-                Debug.Log("🔋 Restored large amount of health!");
-                break;
-            case MushroomRarity.Epic:
-                // Temporary speed boost
-                Debug.Log("⚡ Gained speed boost!");
-                break;
-            case MushroomRarity.Legendary:
-                // Special effect
-                Debug.Log("✨ Gained mysterious power!");
-                break;
-        }
     }
 
     void SpawnMushroomInWorld(InventoryItem item)
