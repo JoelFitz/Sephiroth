@@ -18,7 +18,7 @@ MonoBehaviour:
   detectionRange: 7
   personalityPrefab: {fileID: 8920490542265044307, guid: 34d06dfe0b5dea94fab1d8878a9088ea, type: 3}
   hideSpeed: 2
-  hideDepth: 1
+  hideDepth: 0.49
   fleeSpeed: 7.41
   mushroomPrefab: {fileID: 4952714688327844399, guid: 630941928679c7e46943cfd1efcf61e2, type: 3}
   collectionEffect: {fileID: 0}
