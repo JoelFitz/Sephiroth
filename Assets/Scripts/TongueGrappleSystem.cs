@@ -39,6 +39,8 @@ public class TongueGrappleSystem : MonoBehaviour
     // Internal Components
     private CharacterController characterController;
     private OverheadController playerController;
+    private PlayerMotor playerMotor;
+    private Rigidbody playerRigidbody;
     private LineRenderer tongueRenderer;
     private AudioSource audioSource;
 
@@ -76,9 +78,12 @@ public class TongueGrappleSystem : MonoBehaviour
         characterController = GetComponent<CharacterController>();
         playerController = GetComponent<OverheadController>();
 
-        if (characterController == null)
+        playerMotor = GetComponent<PlayerMotor>();
+        playerRigidbody = GetComponent<Rigidbody>();
+
+        if (characterController == null && playerMotor == null && playerRigidbody == null)
         {
-            Debug.LogError("TongueGrappleSystem requires a CharacterController component!");
+            Debug.LogError("TongueGrappleSystem requires either a CharacterController, PlayerMotor, or Rigidbody component!");
         }
 
         // Setup audio
@@ -383,10 +388,18 @@ public class TongueGrappleSystem : MonoBehaviour
                 Debug.Log("Swing complete!");
 
                 // Move to exact target position
-                Vector3 finalMove = endPos - transform.position;
-                if (characterController != null)
+                if (playerMotor != null)
                 {
+                    playerMotor.MoveTo(endPos);
+                }
+                else if (characterController != null)
+                {
+                    Vector3 finalMove = endPos - transform.position;
                     characterController.Move(finalMove);
+                }
+                else if (playerRigidbody != null)
+                {
+                    playerRigidbody.MovePosition(endPos);
                 }
 
                 ReleaseGrapple();
@@ -408,12 +421,20 @@ public class TongueGrappleSystem : MonoBehaviour
                 targetPosition = Vector3.Lerp(midPoint, endPos, t);
             }
 
-            // Move character controller
+            // Move player along the swing arc
             Vector3 moveDirection = targetPosition - transform.position;
-            if (characterController != null && moveDirection.magnitude > 0.1f)
+            if (playerMotor != null)
+            {
+                playerMotor.MoveTo(targetPosition);
+            }
+            else if (characterController != null && moveDirection.magnitude > 0.1f)
             {
                 Debug.Log($"Moving player: {moveDirection.magnitude:F2} units");
                 characterController.Move(moveDirection);
+            }
+            else if (playerRigidbody != null)
+            {
+                playerRigidbody.MovePosition(targetPosition);
             }
 
             yield return null;
@@ -458,7 +479,7 @@ public class TongueGrappleSystem : MonoBehaviour
 
     void UpdateGrappleState()
     {
-        // Add gravity during swing if needed
+        // Add extra gravity only for CharacterController-based movement; Rigidbody uses built-in gravity.
         if (currentState == GrappleState.Swinging && characterController != null)
         {
             // Light downward force to keep character grounded to the arc

@@ -48,7 +48,12 @@ public class OverheadController : MonoBehaviour
     public bool allowCameraRotation = false;
     public float cameraRotationSpeed = 2f;
 
+    [Header("Camera Smoothing")]
+    public float cameraFollowSpeed = 10f; // Adjustable smoothing speed
+    public bool useSmoothFollow = true;
+
     private CharacterController characterController;
+    private PlayerMotor playerMotor;
     private Camera cam;
     private float rotationVelocity;
     private Vector3 velocity;
@@ -68,6 +73,7 @@ public class OverheadController : MonoBehaviour
     void Start()
     {
         characterController = GetComponent<CharacterController>();
+        playerMotor = GetComponent<PlayerMotor>();
 
         // Set up camera if not assigned
         if (cameraTransform == null)
@@ -144,7 +150,6 @@ public class OverheadController : MonoBehaviour
         HandleUpArrowAdjustment();
         HandleSnapRotation();
         HandleCameraCollision();
-        HandleCameraFollow();
         HandleGravity();
 
         // UI interaction
@@ -153,6 +158,12 @@ public class OverheadController : MonoBehaviour
             Cursor.lockState = Cursor.lockState == CursorLockMode.Locked ?
                 CursorLockMode.None : CursorLockMode.Locked;
         }
+    }
+
+    void LateUpdate()
+    {
+        // Follow the player after physics has updated to reduce jitter
+        HandleCameraFollow();
     }
 
     void HandleUpArrowAdjustment()
@@ -291,7 +302,15 @@ public class OverheadController : MonoBehaviour
 
     void HandleGroundCheck()
     {
-        isGrounded = characterController.isGrounded;
+        if (playerMotor != null)
+        {
+            // PlayerMotor handles its own grounded logic; OverheadController only needs a flag.
+            isGrounded = playerMotor.IsGrounded();
+        }
+        else if (characterController != null)
+        {
+            isGrounded = characterController.isGrounded;
+        }
     }
 
     void HandleMovement()
@@ -332,8 +351,15 @@ public class OverheadController : MonoBehaviour
                 moveDirection = inputDirection;
             }
 
-            // Move character
-            characterController.Move(moveDirection * moveSpeed * Time.deltaTime);
+            // Move character via physics motor if available, otherwise fall back to CharacterController.
+            if (playerMotor != null)
+            {
+                playerMotor.ApplyHorizontalVelocity(moveDirection * moveSpeed);
+            }
+            else if (characterController != null)
+            {
+                characterController.Move(moveDirection * moveSpeed * Time.deltaTime);
+            }
 
             // Rotate character to face movement direction
             if (moveDirection != Vector3.zero)
@@ -385,9 +411,20 @@ public class OverheadController : MonoBehaviour
     {
         if (cameraTransform == null) return;
 
-        // Always position camera relative to player, using the current offset
+        // Get the target position
         Vector3 targetPosition = transform.position + cameraOffset;
-        cameraTransform.position = Vector3.Lerp(cameraTransform.position, targetPosition, Time.deltaTime * 5f);
+
+        if (useSmoothFollow && playerMotor != null)
+        {
+            // Use smooth interpolation for physics-based movement
+            float smoothTime = 1f / cameraFollowSpeed;
+            cameraTransform.position = Vector3.Slerp(cameraTransform.position, targetPosition, Time.deltaTime * cameraFollowSpeed);
+        }
+        else
+        {
+            // Direct following (old method)
+            cameraTransform.position = Vector3.Lerp(cameraTransform.position, targetPosition, Time.deltaTime * 5f);
+        }
 
         // Always look at the player
         cameraTransform.LookAt(transform.position + Vector3.up);
@@ -395,6 +432,14 @@ public class OverheadController : MonoBehaviour
 
     void HandleGravity()
     {
+        // If using physics-based motor, let Rigidbody + Unity gravity handle Y motion.
+        if (playerMotor != null)
+        {
+            return;
+        }
+
+        if (characterController == null) return;
+
         if (isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
@@ -513,6 +558,11 @@ public class OverheadController : MonoBehaviour
     {
         movementEnabled = enabled;
         Debug.Log($"OverheadController movement enabled: {enabled}");
+
+        if (playerMotor != null)
+        {
+            playerMotor.SetMovementEnabled(enabled);
+        }
     }
 
     public bool IsMovementEnabled()

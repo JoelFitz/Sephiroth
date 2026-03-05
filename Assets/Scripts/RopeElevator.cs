@@ -48,6 +48,19 @@ public class RopeElevator : MonoBehaviour
     [Tooltip("Optional override material for the rope; if null, will try to pull from FrogTongueController.")]
     public Material ropeMaterial;
 
+    [Header("Elevator Physics")]
+    [Tooltip("Final rope length from the anchor when fully reeled in (gives some swing room).")]
+    public float targetDistanceFromAnchor = 1.5f;
+
+    [Tooltip("How quickly the rope length (joint max distance) shortens towards the target distance.")]
+    public float reelSpeed = 2f;
+
+    [Tooltip("Spring strength of the elevator joint pulling the player towards the anchor.")]
+    public float elevatorSpring = 40f;
+
+    [Tooltip("Damping on the elevator joint to prevent excessive oscillation.")]
+    public float elevatorDamper = 5f;
+
     [Header("Debug")]
     [Tooltip("Draw gizmos for the rope path and trigger occupancy.")]
     public bool drawGizmos = true;
@@ -57,6 +70,8 @@ public class RopeElevator : MonoBehaviour
     private OverheadController overheadController;
     private TongueGrappleSystem grappleSystem;
     private FrogTongueController frogTongueController;
+    private PlayerMotor playerMotor;
+    private Rigidbody playerRigidbody;
     private Transform tongueAnchor; // Frog's mouth anchor
 
     private bool playerInZone;
@@ -70,6 +85,7 @@ public class RopeElevator : MonoBehaviour
     private readonly List<GameObject> ropeSegments = new List<GameObject>();
     private float currentRopeLength;
     private float targetRopeLength;
+    private SpringJoint elevatorJoint;
 
     void Reset()
     {
@@ -93,13 +109,11 @@ public class RopeElevator : MonoBehaviour
                 break;
         }
 
+        HandleInput();
+
         if (isRiding)
         {
             UpdateRide();
-        }
-        else if (playerInZone && playerTransform != null && ropeState == RopeState.Idle)
-        {
-            HandleInput();
         }
     }
 
@@ -107,6 +121,13 @@ public class RopeElevator : MonoBehaviour
     {
         if (Input.GetKeyDown(useKey))
         {
+            // While attached to the elevator, pressing the key again detaches.
+            if (isRiding)
+            {
+                DetachFromElevator();
+                return;
+            }
+
             if (grappleSystem != null && grappleSystem.IsGrappling())
             {
                 // Do not start elevator while grappling.
@@ -131,7 +152,7 @@ public class RopeElevator : MonoBehaviour
             return;
         }
 
-        if (playerController == null || playerTransform == null)
+        if (playerTransform == null)
         {
             return;
         }
@@ -170,7 +191,20 @@ public class RopeElevator : MonoBehaviour
         {
             Vector3 targetXZ = new Vector3(closestOnLineXZ.x, playerPos.y, closestOnLineXZ.z);
             Vector3 horizontalDelta = targetXZ - playerPos;
-            playerController.Move(horizontalDelta);
+
+            if (playerMotor != null)
+            {
+                playerMotor.MoveTo(playerPos + horizontalDelta);
+            }
+            else if (playerRigidbody != null)
+            {
+                playerRigidbody.MovePosition(playerPos + horizontalDelta);
+            }
+            else if (playerController != null)
+            {
+                playerController.Move(horizontalDelta);
+            }
+
             playerPos = playerTransform.position;
         }
 
@@ -180,10 +214,7 @@ public class RopeElevator : MonoBehaviour
         rideProgress = t;
 
         // Disable normal movement while we're in the elevator sequence.
-        if (overheadController != null)
-        {
-            overheadController.SetMovementEnabled(false);
-        }
+        // For the physics-based elevator we keep movement enabled so the player has agency.
 
         // Set up rope/tongue visual and start extending it.
         SetupTongueReferences();
@@ -268,7 +299,7 @@ public class RopeElevator : MonoBehaviour
         if (Mathf.Approximately(currentRopeLength, targetRopeLength))
         {
             ropeState = RopeState.Riding;
-            isRiding = true;
+            AttachElevatorJoint();
         }
     }
 
@@ -382,54 +413,77 @@ public class RopeElevator : MonoBehaviour
 
     void UpdateRide()
     {
-        if (playerController == null || playerTransform == null || bottomPoint == null || topPoint == null)
+        if (!isRiding || playerTransform == null)
+        {
+            StopRide();
+            return;
+        }
+        
+        if (elevatorJoint == null)
         {
             StopRide();
             return;
         }
 
-        Vector3 start = bottomPoint.position;
-        Vector3 end = topPoint.position;
-        float totalDistance = Vector3.Distance(start, end);
-        if (totalDistance < 0.1f)
-        {
-            StopRide();
-            return;
-        }
-
-        // Advance progress based on rideSpeed.
-        float deltaT = (rideSpeed / totalDistance) * Time.deltaTime;
-        rideProgress = Mathf.Clamp01(rideProgress + deltaT);
-
-        Vector3 targetOnLine = Vector3.Lerp(start, end, rideProgress);
-
-        // Move the player using CharacterController so we respect collisions.
-        Vector3 currentPos = playerTransform.position;
-        Vector3 moveDelta = targetOnLine - currentPos;
-        playerController.Move(moveDelta);
-
-        // End ride when we reach the top.
-        if (Mathf.Approximately(rideProgress, 1f) || Vector3.Distance(playerTransform.position, end) < 0.05f)
-        {
-            StopRide();
-        }
+        // Gradually reel the maximum rope length towards the target distance to the anchor.
+        float currentMax = elevatorJoint.maxDistance;
+        float desired = Mathf.Max(targetDistanceFromAnchor, 0.1f);
+        elevatorJoint.maxDistance = Mathf.MoveTowards(currentMax, desired, reelSpeed * Time.deltaTime);
     }
 
     void StopRide()
     {
-        if (isRiding)
+        DetachFromElevator();
+    }
+
+    void AttachElevatorJoint()
+    {
+        if (playerRigidbody == null || elevatorAnchorPoint == null)
         {
-            if (overheadController != null)
-            {
-                overheadController.SetMovementEnabled(true);
-            }
+            Debug.LogWarning("RopeElevator: Cannot attach elevator joint – missing Rigidbody or anchor.");
+            isRiding = false;
+            return;
+        }
+
+        // Ensure the anchor has a kinematic Rigidbody to attach to.
+        Rigidbody anchorBody = elevatorAnchorPoint.GetComponent<Rigidbody>();
+        if (anchorBody == null)
+        {
+            anchorBody = elevatorAnchorPoint.gameObject.AddComponent<Rigidbody>();
+            anchorBody.isKinematic = true;
+            anchorBody.useGravity = false;
+        }
+
+        float initialDistance = Vector3.Distance(playerTransform.position, elevatorAnchorPoint.position);
+        float clampedTarget = Mathf.Clamp(targetDistanceFromAnchor, 0.1f, initialDistance);
+
+        elevatorJoint = playerRigidbody.gameObject.AddComponent<SpringJoint>();
+        elevatorJoint.connectedBody = anchorBody;
+        elevatorJoint.autoConfigureConnectedAnchor = false;
+        elevatorJoint.anchor = Vector3.zero;
+        elevatorJoint.connectedAnchor = Vector3.zero;
+
+        elevatorJoint.minDistance = clampedTarget;
+        elevatorJoint.maxDistance = initialDistance;
+        elevatorJoint.spring = elevatorSpring;
+        elevatorJoint.damper = elevatorDamper;
+        elevatorJoint.enableCollision = false;
+
+        isRiding = true;
+    }
+
+    void DetachFromElevator()
+    {
+        if (elevatorJoint != null)
+        {
+            Destroy(elevatorJoint);
+            elevatorJoint = null;
         }
 
         isRiding = false;
         rideProgress = 0f;
 
         // After reaching the top, let the rope visually retract and clear itself.
-        ropeState = RopeState.Riding;
         currentRopeLength = 0f;
         ClearRopeSegments();
         ropeState = RopeState.Idle;
@@ -464,14 +518,18 @@ public class RopeElevator : MonoBehaviour
         overheadController = other.GetComponent<OverheadController>();
         grappleSystem = other.GetComponent<TongueGrappleSystem>();
         frogTongueController = other.GetComponent<FrogTongueController>();
+        playerMotor = other.GetComponent<PlayerMotor>();
+        playerRigidbody = other.GetComponent<Rigidbody>();
 
-        if (playerController == null || overheadController == null)
+        if ((playerController == null && playerMotor == null && playerRigidbody == null) || overheadController == null)
         {
+            playerTransform = other.GetComponentInParent<Transform>();
             playerController = other.GetComponentInParent<CharacterController>();
             overheadController = other.GetComponentInParent<OverheadController>();
             grappleSystem = other.GetComponentInParent<TongueGrappleSystem>();
             frogTongueController = other.GetComponentInParent<FrogTongueController>();
-            playerTransform = other.GetComponentInParent<Transform>();
+            playerMotor = other.GetComponentInParent<PlayerMotor>();
+            playerRigidbody = other.GetComponentInParent<Rigidbody>();
         }
     }
 
@@ -482,6 +540,8 @@ public class RopeElevator : MonoBehaviour
         overheadController = null;
         grappleSystem = null;
         frogTongueController = null;
+        playerMotor = null;
+        playerRigidbody = null;
         tongueAnchor = null;
     }
 
