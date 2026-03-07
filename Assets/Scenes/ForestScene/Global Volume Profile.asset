@@ -225,6 +225,37 @@ MonoBehaviour:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
+--- !u!114 &-5258325966403681794
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4828eed00b6489e4282a996a588095ff, type: 3}
+  m_Name: OutlineVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 1
+  Enabled:
+    m_OverrideState: 1
+    m_Value: 1
+  OutlineColor:
+    m_OverrideState: 1
+    m_Value: {r: 0.05, g: 0.03, b: 0.08, a: 1}
+  Thickness:
+    m_OverrideState: 1
+    m_Value: 4
+  DepthSensitivity:
+    m_OverrideState: 1
+    m_Value: 4.95
+  NormalSensitivity:
+    m_OverrideState: 1
+    m_Value: 3.28
+  EdgeThreshold:
+    m_OverrideState: 1
+    m_Value: 0.157
 --- !u!114 &-4472215065563087621
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -268,7 +299,7 @@ MonoBehaviour:
   active: 1
   shadows:
     m_OverrideState: 1
-    m_Value: {x: 0.7714917, y: 1, z: 0.803687, w: 0.32941177}
+    m_Value: {x: 0.8482393, y: 1, z: 0.90601015, w: 0.32941177}
   midtones:
     m_OverrideState: 1
     m_Value: {x: 1, y: 0.93613225, z: 0.85911846, w: 0.08235294}
@@ -345,6 +376,7 @@ MonoBehaviour:
   - {fileID: 5570377584744508443}
   - {fileID: -3900835118186468287}
   - {fileID: -7533625363553618655}
+  - {fileID: -5258325966403681794}
 --- !u!114 &5570377584744508443
 MonoBehaviour:
   m_ObjectHideFlags: 3

@@ -59,6 +59,7 @@ public class OverheadController : MonoBehaviour
     private Vector3 velocity;
     private bool isGrounded;
     private Vector3 cameraOffset;
+    private Vector3 cameraVelocity; // for SmoothDamp
 
     // Camera collision variables
     private float currentCameraDistance;
@@ -69,6 +70,7 @@ public class OverheadController : MonoBehaviour
     private bool qPressed = false;
     private bool ePressed = false;
     private bool movementEnabled = true;
+    private int pendingSnapSteps = 0;
 
     void Start()
     {
@@ -213,17 +215,31 @@ public class OverheadController : MonoBehaviour
         bool qPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
         bool ePressedThisFrame = Input.GetKeyDown(KeyCode.E);
 
-        if (qPressedThisFrame && !isRotating)
+        if (qPressedThisFrame)
         {
-            // Rotate 90 degrees counter-clockwise
-            targetCameraAngle -= 90f;
-            isRotating = true;
+            // Queue a 90-degree counter-clockwise step
+            if (!isRotating)
+            {
+                targetCameraAngle -= 90f;
+                isRotating = true;
+            }
+            else
+            {
+                pendingSnapSteps -= 1;
+            }
         }
-        else if (ePressedThisFrame && !isRotating)
+        else if (ePressedThisFrame)
         {
-            // Rotate 90 degrees clockwise
-            targetCameraAngle += 90f;
-            isRotating = true;
+            // Queue a 90-degree clockwise step
+            if (!isRotating)
+            {
+                targetCameraAngle += 90f;
+                isRotating = true;
+            }
+            else
+            {
+                pendingSnapSteps += 1;
+            }
         }
 
         // Normalize target angle to 0-360 range
@@ -233,14 +249,24 @@ public class OverheadController : MonoBehaviour
         // Smooth rotation towards target
         if (isRotating)
         {
-            float angleDifference = Mathf.DeltaAngle(currentCameraAngle, targetCameraAngle);
-            currentCameraAngle += Mathf.Sign(angleDifference) * snapRotationSpeed * 90f * Time.deltaTime;
+            float maxDelta = snapRotationSpeed * 90f * Time.deltaTime; // degrees per second scaled
+            currentCameraAngle = Mathf.MoveTowardsAngle(currentCameraAngle, targetCameraAngle, maxDelta);
 
-            // Check if we're close enough to snap to target
+            // If we've effectively reached the target angle, either consume a queued step or stop.
             if (Mathf.Abs(Mathf.DeltaAngle(currentCameraAngle, targetCameraAngle)) < snapRotationThreshold)
             {
                 currentCameraAngle = targetCameraAngle;
-                isRotating = false;
+
+                if (pendingSnapSteps != 0)
+                {
+                    int stepDirection = pendingSnapSteps > 0 ? 1 : -1;
+                    targetCameraAngle += 90f * stepDirection;
+                    pendingSnapSteps -= stepDirection;
+                }
+                else
+                {
+                    isRotating = false;
+                }
             }
 
             // Normalize current angle
@@ -411,19 +437,26 @@ public class OverheadController : MonoBehaviour
     {
         if (cameraTransform == null) return;
 
-        // Get the target position
+        // Get the target position (player + offset)
         Vector3 targetPosition = transform.position + cameraOffset;
 
         if (useSmoothFollow && playerMotor != null)
         {
-            // Use smooth interpolation for physics-based movement
-            float smoothTime = 1f / cameraFollowSpeed;
-            cameraTransform.position = Vector3.Slerp(cameraTransform.position, targetPosition, Time.deltaTime * cameraFollowSpeed);
+            // Use SmoothDamp for stable, non-jittery camera following of a physics-driven player
+            float smoothTime = 1f / Mathf.Max(cameraFollowSpeed, 0.01f);
+            cameraTransform.position = Vector3.SmoothDamp(
+                cameraTransform.position,
+                targetPosition,
+                ref cameraVelocity,
+                smoothTime);
         }
         else
         {
-            // Direct following (old method)
-            cameraTransform.position = Vector3.Lerp(cameraTransform.position, targetPosition, Time.deltaTime * 5f);
+            // Direct following (legacy path)
+            cameraTransform.position = Vector3.Lerp(
+                cameraTransform.position,
+                targetPosition,
+                Time.deltaTime * 5f);
         }
 
         // Always look at the player

@@ -41,6 +41,10 @@ public class PlayerMotor : MonoBehaviour
 
         // Prevent physics from tipping the frog over; we rotate via transform instead.
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+
+        // Enable interpolation so camera following the Rigidbody is smoother.
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
     }
 
     void FixedUpdate()
