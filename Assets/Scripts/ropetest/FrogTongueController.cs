@@ -55,6 +55,12 @@ public class FrogTongueController : MonoBehaviour
         SetupTongueAnchor();
         SetupVisualTongue();
         CreateTongue();
+
+        int tongueLayer = LayerMask.NameToLayer("Rope");
+        int playerLayer = LayerMask.NameToLayer("Player");
+
+        if (tongueLayer != -1 && playerLayer != -1)
+            Physics.IgnoreLayerCollision(tongueLayer, playerLayer, true);
     }
 
     void SetupTongueAnchor()

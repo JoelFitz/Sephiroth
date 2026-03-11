@@ -69,8 +69,8 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
             // Set tangent modes for smooth interpolation
             for (int i = 0; i < quitBoxAnimationCurve.keys.Length; i++)
             {
-                AnimationUtility.SetKeyLeftTangentMode(quitBoxAnimationCurve, i, AnimationUtility.TangentMode.Auto);
-                AnimationUtility.SetKeyRightTangentMode(quitBoxAnimationCurve, i, AnimationUtility.TangentMode.Auto);
+                //AnimationUtility.SetKeyLeftTangentMode(quitBoxAnimationCurve, i, AnimationUtility.TangentMode.Auto);
+                //AnimationUtility.SetKeyRightTangentMode(quitBoxAnimationCurve, i, AnimationUtility.TangentMode.Auto);
             }
         }
 
