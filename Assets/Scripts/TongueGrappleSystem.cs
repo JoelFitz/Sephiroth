@@ -172,6 +172,8 @@ public class TongueGrappleSystem : MonoBehaviour
             tongueRenderer.positionCount = 0;
             tongueRenderer.useWorldSpace = true;
 
+            //tongueRenderer.gameObject.GetComponent<Collider>().enabled = false;
+
             Debug.Log("TongueGrappleSystem: LineRenderer setup complete");
         }
         catch (System.Exception e)
