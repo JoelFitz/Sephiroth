@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class OverheadController : MonoBehaviour
 {
@@ -6,12 +6,16 @@ public class OverheadController : MonoBehaviour
     public float moveSpeed = 5f;
     public float rotationSmoothTime = 0.1f;
 
+    [Header("Sprint")]
+    [Tooltip("Hold this key to sprint.")]
+    public KeyCode sprintKey = KeyCode.LeftShift;
+
     [Header("Camera Settings")]
     public Transform cameraTransform;
     public float cameraHeight = 15f;
-    public float cameraAngle = 45f; // Angle for isometric
-    public float cameraDistance = 10f; // How far back the camera sits
-    public bool useOrthographic = true; // animal crossing
+    public float cameraAngle = 45f;
+    public float cameraDistance = 10f;
+    public bool useOrthographic = true;
     public float orthographicSize = 8f;
 
     [Header("Animal Crossing Style Camera")]
@@ -39,17 +43,17 @@ public class OverheadController : MonoBehaviour
 
     [Header("Camera Collision")]
     public bool enableCameraCollision = true;
-    public LayerMask wallLayerMask = -1; // What layers count as walls
-    public float cameraCollisionRadius = 0.5f; // Camera collision sphere radius
-    public float minCameraDistance = 2f; // Minimum distance camera can be from player
-    public float collisionSmoothTime = 0.2f; // How quickly camera adjusts when hitting walls
+    public LayerMask wallLayerMask = -1;
+    public float cameraCollisionRadius = 0.5f;
+    public float minCameraDistance = 2f;
+    public float collisionSmoothTime = 0.2f;
 
     [Header("Camera Controls")]
     public bool allowCameraRotation = false;
     public float cameraRotationSpeed = 2f;
 
     [Header("Camera Smoothing")]
-    public float cameraFollowSpeed = 10f; // Adjustable smoothing speed
+    public float cameraFollowSpeed = 10f;
     public bool useSmoothFollow = true;
 
     private CharacterController characterController;
@@ -59,45 +63,40 @@ public class OverheadController : MonoBehaviour
     private Vector3 velocity;
     private bool isGrounded;
     private Vector3 cameraOffset;
-    private Vector3 cameraVelocity; // for SmoothDamp
+    private Vector3 cameraVelocity;
 
-    // Camera collision variables
     private float currentCameraDistance;
     private float targetCameraDistance;
     private float cameraDistanceVelocity;
 
-    // Input handling
-    private bool qPressed = false;
-    private bool ePressed = false;
     private bool movementEnabled = true;
     private int pendingSnapSteps = 0;
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     void Start()
     {
         characterController = GetComponent<CharacterController>();
         playerMotor = GetComponent<PlayerMotor>();
 
-        // Set up camera if not assigned
         if (cameraTransform == null)
-        {
             cameraTransform = Camera.main.transform;
-        }
 
         cam = cameraTransform.GetComponent<Camera>();
 
-        // Store default camera values
         defaultCameraHeight = cameraHeight;
         defaultCameraDistance = cameraDistance;
         defaultCameraAngle = cameraAngle;
         defaultOrthographicSize = orthographicSize;
 
-        // Initialize camera distance and angle
         currentCameraDistance = cameraDistance;
         targetCameraDistance = cameraDistance;
         targetCameraAngle = 0f;
         currentCameraAngle = 0f;
 
         SetupCamera();
+
+        // Initial offset bake — camera not yet following, so direct call is fine here.
         CalculateCameraOffset();
     }
 
@@ -105,7 +104,6 @@ public class OverheadController : MonoBehaviour
     {
         if (cam == null) return;
 
-        // Set camera projection
         if (useOrthographic)
         {
             cam.orthographic = true;
@@ -114,60 +112,74 @@ public class OverheadController : MonoBehaviour
         else
         {
             cam.orthographic = false;
-            cam.fieldOfView = 60f; // Perspective FOV
+            cam.fieldOfView = 60f;
         }
 
-        // Position and angle the camera for overhead view
         PositionCamera();
     }
 
+    // Only called from Start/SetupCamera (once) and from SetCameraAngle (editor-time).
+    // Never called mid-frame from Update — use LateUpdate path for that.
     void CalculateCameraOffset()
     {
-        // Use the collision-adjusted distance
         Vector3 direction = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
         cameraOffset = direction * currentCameraDistance + Vector3.up * cameraHeight;
     }
 
+    // Only used at Start to snap camera into position immediately.
     void PositionCamera()
     {
         if (cameraTransform == null) return;
 
-        // Position camera above and at an angle
         cameraTransform.position = transform.position + cameraOffset;
-
-        // Look at the player with the specified angle
         cameraTransform.LookAt(transform.position + Vector3.up);
 
-        // Adjust the angle for isometric 
         Vector3 euler = cameraTransform.eulerAngles;
         euler.x = cameraAngle;
         cameraTransform.rotation = Quaternion.Euler(euler);
     }
+
+    // ── Update: game logic & input only — no camera transform writes ─────────
 
     void Update()
     {
         HandleGroundCheck();
         HandleMovement();
         HandleCameraControls();
-        HandleUpArrowAdjustment();
-        HandleSnapRotation();
-        HandleCameraCollision();
+        HandleUpArrowAdjustment();   // updates cameraHeight/Angle/Distance targets only
+        HandleSnapRotation();        // updates currentCameraAngle only
+        UpdateCameraCollisionTarget(); // updates targetCameraDistance only
         HandleGravity();
 
-        // UI interaction
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            Cursor.lockState = Cursor.lockState == CursorLockMode.Locked ?
-                CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
+                ? CursorLockMode.None
+                : CursorLockMode.Locked;
         }
     }
 
+    // ── LateUpdate: ALL camera transform writes happen here, once per frame ──
+    // Runs after Rigidbody interpolation has settled — eliminates jitter.
+
     void LateUpdate()
     {
-        // Follow the player after physics has updated to reduce jitter
+        // 1. Smooth the collision-adjusted distance towards its target.
+        currentCameraDistance = Mathf.SmoothDamp(
+            currentCameraDistance, targetCameraDistance,
+            ref cameraDistanceVelocity, collisionSmoothTime);
+
+        // 2. Bake offset once with fully settled angle + distance values.
+        CalculateCameraOffset();
+
+        // 3. Move and orient the camera.
         HandleCameraFollow();
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Updates cameraHeight, cameraDistance, cameraAngle scalars only.
+    // Does NOT call CalculateCameraOffset — that happens in LateUpdate.
     void HandleUpArrowAdjustment()
     {
         if (!enableUpArrowAdjustment) return;
@@ -175,23 +187,15 @@ public class OverheadController : MonoBehaviour
         bool upPressed = Input.GetKey(KeyCode.G);
 
         if (upPressed && !isUpViewActive)
-        {
-            // Transition to up view
             isUpViewActive = true;
-        }
         else if (!upPressed && isUpViewActive)
-        {
-            // Transition back to normal view
             isUpViewActive = false;
-        }
 
-        // Smoothly interpolate between normal and up view settings
         float targetHeight = isUpViewActive ? upViewCameraHeight : defaultCameraHeight;
         float targetDistance = isUpViewActive ? upViewCameraDistance : defaultCameraDistance;
         float targetAngle = isUpViewActive ? upViewCameraAngle : defaultCameraAngle;
         float targetOrthoSize = isUpViewActive ? upViewOrthographicSize : defaultOrthographicSize;
 
-        // Smooth transitions
         cameraHeight = Mathf.Lerp(cameraHeight, targetHeight, Time.deltaTime * upViewTransitionSpeed);
         cameraDistance = Mathf.Lerp(cameraDistance, targetDistance, Time.deltaTime * upViewTransitionSpeed);
         cameraAngle = Mathf.Lerp(cameraAngle, targetAngle, Time.deltaTime * upViewTransitionSpeed);
@@ -202,66 +206,48 @@ public class OverheadController : MonoBehaviour
             cam.orthographicSize = orthographicSize;
         }
 
-        // Update target camera distance for collision system
+        // Keep the collision target in sync with the (possibly lerping) cameraDistance.
+        // The actual currentCameraDistance is smoothed in LateUpdate.
         targetCameraDistance = cameraDistance;
     }
 
-
+    // Updates currentCameraAngle only.
+    // Does NOT call CalculateCameraOffset — that happens in LateUpdate.
     void HandleSnapRotation()
     {
         if (!useSnapRotation) return;
 
-        // Handle Q and E input for 90-degree snaps
         bool qPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
         bool ePressedThisFrame = Input.GetKeyDown(KeyCode.E);
 
         if (qPressedThisFrame)
         {
-            // Queue a 90-degree counter-clockwise step
-            if (!isRotating)
-            {
-                targetCameraAngle -= 90f;
-                isRotating = true;
-            }
-            else
-            {
-                pendingSnapSteps -= 1;
-            }
+            if (!isRotating) { targetCameraAngle -= 90f; isRotating = true; }
+            else pendingSnapSteps -= 1;
         }
         else if (ePressedThisFrame)
         {
-            // Queue a 90-degree clockwise step
-            if (!isRotating)
-            {
-                targetCameraAngle += 90f;
-                isRotating = true;
-            }
-            else
-            {
-                pendingSnapSteps += 1;
-            }
+            if (!isRotating) { targetCameraAngle += 90f; isRotating = true; }
+            else pendingSnapSteps += 1;
         }
 
-        // Normalize target angle to 0-360 range
         while (targetCameraAngle < 0) targetCameraAngle += 360f;
         while (targetCameraAngle >= 360f) targetCameraAngle -= 360f;
 
-        // Smooth rotation towards target
         if (isRotating)
         {
-            float maxDelta = snapRotationSpeed * 90f * Time.deltaTime; // degrees per second scaled
+            float maxDelta = snapRotationSpeed * 90f * Time.deltaTime;
             currentCameraAngle = Mathf.MoveTowardsAngle(currentCameraAngle, targetCameraAngle, maxDelta);
 
-            // If we've effectively reached the target angle, either consume a queued step or stop.
             if (Mathf.Abs(Mathf.DeltaAngle(currentCameraAngle, targetCameraAngle)) < snapRotationThreshold)
             {
                 currentCameraAngle = targetCameraAngle;
 
                 if (pendingSnapSteps != 0)
                 {
-                    int stepDirection = pendingSnapSteps > 0 ? 1 : -1;
-                    targetCameraAngle += 90f * stepDirection;
-                    pendingSnapSteps -= stepDirection;
+                    int stepDir = pendingSnapSteps > 0 ? 1 : -1;
+                    targetCameraAngle += 90f * stepDir;
+                    pendingSnapSteps -= stepDir;
                 }
                 else
                 {
@@ -269,37 +255,28 @@ public class OverheadController : MonoBehaviour
                 }
             }
 
-            // Normalize current angle
             while (currentCameraAngle < 0) currentCameraAngle += 360f;
             while (currentCameraAngle >= 360f) currentCameraAngle -= 360f;
 
-            CalculateCameraOffset();
+            // NOTE: no CalculateCameraOffset() here — LateUpdate handles it.
         }
     }
 
-    void HandleCameraCollision()
+    // Renamed from HandleCameraCollision.
+    // Only updates targetCameraDistance — no smoothing, no offset bake, no transform writes.
+    void UpdateCameraCollisionTarget()
     {
         if (!enableCameraCollision || cameraTransform == null)
-        {
             targetCameraDistance = cameraDistance;
-        }
         else
-        {
             CheckCameraCollision();
-        }
 
-        // Smoothly adjust camera distance
-        currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetCameraDistance,
-            ref cameraDistanceVelocity, collisionSmoothTime);
-
-        // Recalculate offset with new distance
-        CalculateCameraOffset();
+        // Smoothing and offset bake have been moved to LateUpdate.
     }
 
     void CheckCameraCollision()
     {
         Vector3 playerPosition = transform.position;
-        // Use the current camera angle for collision direction
         Vector3 desiredCameraDirection = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
         Vector3 desiredCameraPosition = playerPosition + desiredCameraDirection * cameraDistance + Vector3.up * cameraHeight;
 
@@ -312,13 +289,11 @@ public class OverheadController : MonoBehaviour
             float safeDistance = hit.distance - cameraCollisionRadius;
             Vector3 hitPoint = playerPosition + rayDirection * safeDistance;
             Vector3 directionToHit = hitPoint - playerPosition;
+            Vector3 horizontalDir = new Vector3(directionToHit.x, 0, directionToHit.z);
+            float horizontalDist = horizontalDir.magnitude;
+            float adjustedDistance = horizontalDist / desiredCameraDirection.magnitude;
 
-            Vector3 horizontalDirection = new Vector3(directionToHit.x, 0, directionToHit.z);
-            float horizontalDistance = horizontalDirection.magnitude;
-
-            float adjustedCameraDistance = horizontalDistance / desiredCameraDirection.magnitude;
-
-            targetCameraDistance = Mathf.Max(adjustedCameraDistance, minCameraDistance);
+            targetCameraDistance = Mathf.Max(adjustedDistance, minCameraDistance);
         }
         else
         {
@@ -329,91 +304,74 @@ public class OverheadController : MonoBehaviour
     void HandleGroundCheck()
     {
         if (playerMotor != null)
-        {
-            // PlayerMotor handles its own grounded logic; OverheadController only needs a flag.
             isGrounded = playerMotor.IsGrounded();
-        }
         else if (characterController != null)
-        {
             isGrounded = characterController.isGrounded;
-        }
     }
 
     void HandleMovement()
     {
         if (!movementEnabled) return;
 
-        // Get input
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
 
         Vector3 inputDirection = new Vector3(horizontal, 0f, vertical).normalized;
 
+        bool sprintHeld = Input.GetKey(sprintKey);
+        if (playerMotor != null)
+            playerMotor.SetSprinting(sprintHeld && inputDirection.magnitude >= 0.1f);
+
         if (inputDirection.magnitude >= 0.1f)
         {
-            // For overhead view, we want movement relative to current camera angle
             Vector3 moveDirection;
 
             if (useSnapRotation)
             {
-                // Move relative to current camera orientation (Animal Crossing style)
                 float cameraRad = currentCameraAngle * Mathf.Deg2Rad;
                 Vector3 cameraForward = new Vector3(Mathf.Sin(cameraRad), 0, Mathf.Cos(cameraRad));
                 Vector3 cameraRight = new Vector3(Mathf.Cos(cameraRad), 0, -Mathf.Sin(cameraRad));
-
-                moveDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x);
+                moveDirection = cameraForward * inputDirection.z + cameraRight * inputDirection.x;
             }
             else if (allowCameraRotation)
             {
-                // Move relative to camera orientation
                 Vector3 cameraForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
                 Vector3 cameraRight = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
-
-                moveDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x);
+                moveDirection = cameraForward * inputDirection.z + cameraRight * inputDirection.x;
             }
             else
             {
-                // Move relative to world axes (classic style)
                 moveDirection = inputDirection;
             }
 
-            // Move character via physics motor if available, otherwise fall back to CharacterController.
             if (playerMotor != null)
-            {
                 playerMotor.ApplyHorizontalVelocity(moveDirection * moveSpeed);
-            }
             else if (characterController != null)
-            {
                 characterController.Move(moveDirection * moveSpeed * Time.deltaTime);
-            }
 
-            // Rotate character to face movement direction
             if (moveDirection != Vector3.zero)
             {
                 float targetAngle = Mathf.Atan2(moveDirection.x, moveDirection.z) * Mathf.Rad2Deg;
-                float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref rotationVelocity, rotationSmoothTime);
+                float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle,
+                                                     ref rotationVelocity, rotationSmoothTime);
                 transform.rotation = Quaternion.Euler(0f, angle, 0f);
             }
+        }
+        else
+        {
+            if (playerMotor != null)
+                playerMotor.SetSprinting(false);
         }
     }
 
     void HandleCameraControls()
     {
-        // Only handle continuous rotation if not using snap rotation
         if (allowCameraRotation && !useSnapRotation)
         {
-            // camera rotation Q and E
-            if (Input.GetKey(KeyCode.Q))
-            {
-                RotateCamera(-cameraRotationSpeed * Time.deltaTime);
-            }
-            if (Input.GetKey(KeyCode.E))
-            {
-                RotateCamera(cameraRotationSpeed * Time.deltaTime);
-            }
+            if (Input.GetKey(KeyCode.Q)) RotateCamera(-cameraRotationSpeed * Time.deltaTime);
+            if (Input.GetKey(KeyCode.E)) RotateCamera(cameraRotationSpeed * Time.deltaTime);
         }
 
-        // Zoom in/out with scroll wheel
         if (useOrthographic && cam != null && !isUpViewActive)
         {
             float scroll = Input.GetAxis("Mouse ScrollWheel");
@@ -426,70 +384,59 @@ public class OverheadController : MonoBehaviour
         }
     }
 
+    // Updates currentCameraAngle only — no CalculateCameraOffset call.
     void RotateCamera(float rotationAmount)
     {
         currentCameraAngle += rotationAmount;
         targetCameraAngle = currentCameraAngle;
-        CalculateCameraOffset();
+        // Offset will be recalculated in LateUpdate.
     }
 
+    // The ONLY place that writes to cameraTransform.position / rotation.
     void HandleCameraFollow()
     {
         if (cameraTransform == null) return;
 
-        // Get the target position (player + offset)
+        // cameraOffset was just baked in LateUpdate before this call,
+        // and transform.position is the Rigidbody-interpolated position — no stale data.
         Vector3 targetPosition = transform.position + cameraOffset;
 
         if (useSmoothFollow && playerMotor != null)
         {
-            // Use SmoothDamp for stable, non-jittery camera following of a physics-driven player
+            // Rigidbody interpolation already smooths sub-step movement.
+            // Keep smoothTime tight so SmoothDamp adds minimal extra lag.
             float smoothTime = 1f / Mathf.Max(cameraFollowSpeed, 0.01f);
             cameraTransform.position = Vector3.SmoothDamp(
-                cameraTransform.position,
-                targetPosition,
-                ref cameraVelocity,
-                smoothTime);
+                cameraTransform.position, targetPosition, ref cameraVelocity, smoothTime);
         }
         else
         {
-            // Direct following (legacy path)
-            cameraTransform.position = Vector3.Lerp(
-                cameraTransform.position,
-                targetPosition,
-                Time.deltaTime * 5f);
+            // Direct assignment is perfectly clean in LateUpdate with interpolation on.
+            cameraTransform.position = targetPosition;
         }
 
-        // Always look at the player
         cameraTransform.LookAt(transform.position + Vector3.up);
     }
 
     void HandleGravity()
     {
-        // If using physics-based motor, let Rigidbody + Unity gravity handle Y motion.
-        if (playerMotor != null)
-        {
-            return;
-        }
-
+        if (playerMotor != null) return;
         if (characterController == null) return;
 
         if (isGrounded && velocity.y < 0)
-        {
             velocity.y = -2f;
-        }
 
         velocity.y += Physics.gravity.y * Time.deltaTime;
         characterController.Move(velocity * Time.deltaTime);
     }
 
+    // ── Public API ───────────────────────────────────────────────────────────
+
     public void SetCameraHeight(float height)
     {
         defaultCameraHeight = height;
-        if (!isUpViewActive)
-        {
-            cameraHeight = height;
-            CalculateCameraOffset();
-        }
+        if (!isUpViewActive) cameraHeight = height;
+        // Offset recalculated next LateUpdate automatically.
     }
 
     public void SetCameraAngle(float angle)
@@ -498,6 +445,8 @@ public class OverheadController : MonoBehaviour
         if (!isUpViewActive)
         {
             cameraAngle = angle;
+            // PositionCamera is only safe here if called outside of play-mode LateUpdate;
+            // during play the LateUpdate path will correct it within one frame.
             CalculateCameraOffset();
             PositionCamera();
         }
@@ -515,92 +464,62 @@ public class OverheadController : MonoBehaviour
 
     public void SetOrthographicSize(float size)
     {
-        if (cam != null && useOrthographic)
+        if (cam == null || !useOrthographic) return;
+        defaultOrthographicSize = size;
+        if (!isUpViewActive)
         {
-            defaultOrthographicSize = size;
-            if (!isUpViewActive)
-            {
-                orthographicSize = size;
-                cam.orthographicSize = orthographicSize;
-            }
+            orthographicSize = size;
+            cam.orthographicSize = orthographicSize;
         }
     }
 
-    // Public methods for external control
     public void SnapRotateLeft()
     {
-        if (useSnapRotation && !isRotating)
-        {
-            targetCameraAngle -= 90f;
-            isRotating = true;
-        }
+        if (useSnapRotation && !isRotating) { targetCameraAngle -= 90f; isRotating = true; }
     }
 
     public void SnapRotateRight()
     {
-        if (useSnapRotation && !isRotating)
-        {
-            targetCameraAngle += 90f;
-            isRotating = true;
-        }
+        if (useSnapRotation && !isRotating) { targetCameraAngle += 90f; isRotating = true; }
     }
 
-    public void SetUpView(bool enabled)
-    {
-        isUpViewActive = enabled;
-    }
-
-    // Debug visualization
-    void OnDrawGizmosSelected()
-    {
-        if (!enableCameraCollision || cameraTransform == null) return;
-
-        // Draw the collision detection ray
-        Vector3 playerPosition = transform.position;
-        Vector3 desiredCameraDirection = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
-        Vector3 desiredCameraPosition = playerPosition + desiredCameraDirection * cameraDistance + Vector3.up * cameraHeight;
-
-        // Draw ray from player to desired camera position
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(playerPosition, desiredCameraPosition);
-
-        // Draw collision sphere at camera position
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(cameraTransform.position, cameraCollisionRadius);
-
-        // Draw min distance sphere
-        Gizmos.color = Color.green;
-        Vector3 minDistancePos = playerPosition + desiredCameraDirection * minCameraDistance + Vector3.up * cameraHeight;
-        Gizmos.DrawWireSphere(minDistancePos, cameraCollisionRadius);
-
-        // Draw camera angle indicators
-        Gizmos.color = Color.blue;
-        Vector3 forward = Quaternion.Euler(0, currentCameraAngle, 0) * Vector3.forward;
-        Gizmos.DrawRay(transform.position, forward * 3f);
-
-        // Draw target angle if rotating
-        if (isRotating)
-        {
-            Gizmos.color = Color.cyan;
-            Vector3 targetForward = Quaternion.Euler(0, targetCameraAngle, 0) * Vector3.forward;
-            Gizmos.DrawRay(transform.position, targetForward * 3f);
-        }
-    }
+    public void SetUpView(bool enabled) => isUpViewActive = enabled;
 
     public void SetMovementEnabled(bool enabled)
     {
         movementEnabled = enabled;
         Debug.Log($"OverheadController movement enabled: {enabled}");
+        if (playerMotor != null) playerMotor.SetMovementEnabled(enabled);
+    }
 
-        if (playerMotor != null)
+    public bool IsMovementEnabled() => movementEnabled;
+
+    // ── Debug Gizmos ─────────────────────────────────────────────────────────
+
+    void OnDrawGizmosSelected()
+    {
+        if (!enableCameraCollision || cameraTransform == null) return;
+
+        Vector3 playerPosition = transform.position;
+        Vector3 desiredCameraDirection = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
+        Vector3 desiredCameraPosition = playerPosition + desiredCameraDirection * cameraDistance + Vector3.up * cameraHeight;
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawLine(playerPosition, desiredCameraPosition);
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(cameraTransform.position, cameraCollisionRadius);
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(playerPosition + desiredCameraDirection * minCameraDistance + Vector3.up * cameraHeight, cameraCollisionRadius);
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawRay(transform.position, Quaternion.Euler(0, currentCameraAngle, 0) * Vector3.forward * 3f);
+
+        if (isRotating)
         {
-            playerMotor.SetMovementEnabled(enabled);
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawRay(transform.position, Quaternion.Euler(0, targetCameraAngle, 0) * Vector3.forward * 3f);
         }
     }
-
-    public bool IsMovementEnabled()
-    {
-        return movementEnabled;
-    }
 }
-
