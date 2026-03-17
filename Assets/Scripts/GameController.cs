@@ -66,7 +66,7 @@ public class GameController : MonoBehaviour
     void HandleInput()
     {
         // Toggle quest UI
-        if (Input.GetKeyDown(toggleUIKey))
+        if (UnifiedTabMenuController.Instance == null && Input.GetKeyDown(toggleUIKey))
         {
             ToggleQuestUI();
         }

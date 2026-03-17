@@ -1196,7 +1196,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &205934074
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2348,7 +2348,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &531622762
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2544,7 +2544,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &651123300
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2887,7 +2887,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &845995417
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3166,7 +3166,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &888084535
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3591,7 +3591,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &922452802
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5180,7 +5180,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1292896816
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6145,6 +6145,7 @@ MonoBehaviour:
   pickupRange: 2
   interactKey: 101
   interactionPrompt: {fileID: 0}
+  bookAnimationController: {fileID: 1930987847}
   mushroomEntries:
   - mushroomType: Shiitake
     displayName: Shy Shiitake
@@ -6158,6 +6159,8 @@ MonoBehaviour:
     nameUnlockCount: 1
     habitatUnlockCount: 5
     cookingUnlockCount: 10
+  builtInInputEnabled: 1
+  worldInteractionEnabled: 1
 --- !u!114 &1515374521
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6198,6 +6201,7 @@ MonoBehaviour:
   rotateSpeed: 30
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
+  interactionEnabled: 1
 --- !u!4 &1515374523
 Transform:
   m_ObjectHideFlags: 0
@@ -6355,7 +6359,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1638925767
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10978,6 +10982,7 @@ MonoBehaviour:
   mailUIPanel: {fileID: 1638925766}
   toggleMailKey: 109
   handInButton: {fileID: 311354514}
+  builtInInputEnabled: 1
   rewardPointsPerQuest: 100
   totalUpgradePoints: 0
   questsPerDay: 2
@@ -11229,6 +11234,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1930987843}
   - component: {fileID: 1930987845}
+  - component: {fileID: 1930987847}
+  - component: {fileID: 1930987846}
   m_Layer: 0
   m_Name: BookPanel
   m_TagString: Untagged
@@ -11257,6 +11264,7 @@ RectTransform:
   - {fileID: 890132431}
   - {fileID: 159622801}
   - {fileID: 1155386642}
+  - {fileID: 1973442619}
   m_Father: {fileID: 981905319}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -11271,6 +11279,199 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1930987842}
+  m_CullTransparentMesh: 1
+--- !u!95 &1930987846
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1930987842}
+  m_Enabled: 0
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 43725b876ac1d1344ae003a7d33f9a4e, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1930987847
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1930987842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 044d114023bfbc8429fa8e7a1a8b93af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bookDisplay: {fileID: 1973442620}
+  openFrames:
+  - {fileID: -1509140338, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 965770500, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 2032565529, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 63555892, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 312498742, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -977999751, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 1232144357, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 147495977, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 1599821498, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 2009216430, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -714522513, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -1800917352, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -2096893829, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 14249484, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 301641444, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: 1402522943, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -260330301, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -1632310106, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -1347069463, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -1390542017, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  - {fileID: -1815209255, guid: 0e4c1c674b71e56448b3863389644458, type: 3}
+  zoomInFrames:
+  - {fileID: 2048056784, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 1796314069, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -807999843, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 1823649941, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -895819904, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 868824881, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -1521297793, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 232185525, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -1264407197, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -1822422088, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 392523715, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 814769287, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 1789607570, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 440220232, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: 403607375, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  - {fileID: -242211999, guid: 9c7b22f3bcae1bb469f3573aa263b062, type: 3}
+  zoomOutFrames:
+  - {fileID: 847607067, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: 1508612629, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: 2009065511, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -2098050400, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -483886514, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -1460841726, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: 1092707275, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -1425383280, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -654903620, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -208653326, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: 854132102, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  - {fileID: -1566116862, guid: 60993b9a4b8bc804c88ed6ec234f857c, type: 3}
+  closeFrames:
+  - {fileID: -949851998, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: 852037586, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: -262311702, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: 2018518974, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: -1354313988, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: -1350038921, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: 1149456410, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: -56909791, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  - {fileID: -1149389827, guid: 4b708092aa225a44197b0fcdf0d0edf1, type: 3}
+  flipForwardFrames:
+  - {fileID: 993903138, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 1503354333, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 61266745, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 1687538176, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 1602905648, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 1530486424, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 61979044, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 585314872, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  - {fileID: 832285228, guid: aba866f509e0f774aab95619b322c91c, type: 3}
+  flipBackwardFrames:
+  - {fileID: 992845446, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: 1001495292, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: -107314778, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: 1603483409, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: 846703467, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: -756052236, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: -1637520095, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  - {fileID: -150662104, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
+  bookOpenSprite: {fileID: 21300000, guid: 62e62eb951d0ef442ac99214a7962781, type: 3}
+  frameRate: 12
+--- !u!1 &1973442618
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1973442619}
+  - component: {fileID: 1973442621}
+  - component: {fileID: 1973442620}
+  m_Layer: 0
+  m_Name: BookAnim
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1973442619
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973442618}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.9, y: 0.9, z: 0.9}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 1930987843}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 1900, y: 1295}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1973442620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973442618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 62e62eb951d0ef442ac99214a7962781, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 1
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1973442621
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973442618}
   m_CullTransparentMesh: 1
 --- !u!1 &2028809472
 GameObject:
@@ -12056,6 +12257,7 @@ MonoBehaviour:
   dropSound: {fileID: 0}
   eatSound: {fileID: 0}
   equipSound: {fileID: 0}
+  builtInInputEnabled: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

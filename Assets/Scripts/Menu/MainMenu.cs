@@ -222,6 +222,11 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         Debug.Log("Starting new game...");
         AnimateButtonClick(newGameButton.transform);
+
+        // Build a fresh runtime session and shared TAB UI before entering gameplay scenes.
+        GameSessionManager.EnsureInstance().BeginNewGameSession();
+        UnifiedTabMenuController.EnsureInstance();
+
         // Load the home scene
         AsyncLoader.LoadScene("HomeScene");
     }
