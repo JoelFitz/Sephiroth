@@ -75,6 +75,7 @@ public class MushroomResearchBook : MonoBehaviour
     private Camera playerCamera;
     [SerializeField] private bool builtInInputEnabled = true;
     [SerializeField] private bool worldInteractionEnabled = true;
+    private Coroutine closeBookAnimationRoutine;
 
     // Page content
     private List<BookPagePair> bookPages = new List<BookPagePair>();
@@ -208,7 +209,9 @@ public class MushroomResearchBook : MonoBehaviour
             interactionPrompt.SetActive(false);
 
         if (builtInInputEnabled)
-            HandleInput();
+            HandleInteractionInput();
+
+        HandlePageNavigationInput();
     }
 
     void CheckPlayerProximity()
@@ -226,7 +229,7 @@ public class MushroomResearchBook : MonoBehaviour
         }
     }
 
-    void HandleInput()
+    void HandleInteractionInput()
     {
         if (Input.GetKeyDown(interactKey))
         {
@@ -239,8 +242,11 @@ public class MushroomResearchBook : MonoBehaviour
                 CloseBook();
             }
         }
+    }
 
-        // Keyboard navigation when book is open
+    void HandlePageNavigationInput()
+    {
+        // Keep page navigation active while the book is open, even when unified menu owns open/close input.
         if (isBookOpen)
         {
             if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
@@ -253,6 +259,14 @@ public class MushroomResearchBook : MonoBehaviour
     public void OpenBook()
     {
         if (isBookOpen) return;
+
+        RebindChildReferences();
+
+        if (closeBookAnimationRoutine != null)
+        {
+            StopCoroutine(closeBookAnimationRoutine);
+            closeBookAnimationRoutine = null;
+        }
 
         isBookOpen = true;
 
@@ -275,6 +289,9 @@ public class MushroomResearchBook : MonoBehaviour
         // Ensure the book UI panel/buttons are visible while open
         if (bookUIPanel != null)
             bookUIPanel.SetActive(true);
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
 
         // Play 2D animation sequence
         if (bookAnimationController != null)
@@ -311,7 +328,7 @@ public class MushroomResearchBook : MonoBehaviour
         // Play 2D close animation sequence
         if (bookAnimationController != null)
         {
-            StartCoroutine(CloseBookWithAnimation());
+            closeBookAnimationRoutine = StartCoroutine(CloseBookWithAnimation());
         }
         else
         {
@@ -331,6 +348,9 @@ public class MushroomResearchBook : MonoBehaviour
         if (playerController != null)
             playerController.enabled = true;
 
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         Debug.Log("📖 Research book closed!");
     }
 
@@ -349,6 +369,11 @@ public class MushroomResearchBook : MonoBehaviour
         // Show 3D book again after animations complete
         if (bookModel != null)
             bookModel.SetActive(true);
+
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+
+        closeBookAnimationRoutine = null;
     }
 
     System.Collections.IEnumerator AnimateBookToPosition(Vector3 targetPos, Quaternion targetRot, float duration)

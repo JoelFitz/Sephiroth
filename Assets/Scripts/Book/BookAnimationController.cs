@@ -41,11 +41,31 @@ public class BookAnimationController : MonoBehaviour
     [Tooltip("Frames per second for all animations")]
     public float frameRate = 12f;
 
+    [Header("Scale Settings")]
+    [Tooltip("Scale applied while playing frame-by-frame animations (open/zoom/flip/close)")]
+    public Vector3 animationScale = Vector3.one;
+    [Tooltip("Scale applied when showing the static BookOpen sprite")]
+    public Vector3 staticOpenScale = Vector3.one;
+
     private BookAnimationState currentState = BookAnimationState.Closed;
     private bool hasOpenedBefore = false;
+    private bool isInitialized = false;
 
-    void Start()
+    void Awake()
     {
+        EnsureInitialized();
+    }
+
+    void OnEnable()
+    {
+        EnsureInitialized();
+    }
+
+    private void EnsureInitialized()
+    {
+        if (isInitialized)
+            return;
+
         if (bookDisplay == null)
         {
             Debug.LogError("BookAnimationController: bookDisplay Image not assigned!");
@@ -68,6 +88,7 @@ public class BookAnimationController : MonoBehaviour
         }
 
         bookDisplay.gameObject.SetActive(false);
+        isInitialized = true;
     }
 
     void LateUpdate()
@@ -79,9 +100,15 @@ public class BookAnimationController : MonoBehaviour
 
     public IEnumerator OpenBookSequence()
     {
+        EnsureInitialized();
+
+        if (!isInitialized)
+            yield break;
+
         if (currentState != BookAnimationState.Closed) yield break;
 
         bookDisplay.gameObject.SetActive(true);
+        SetBookDisplayScale(animationScale);
 
         if (!hasOpenedBefore)
         {
@@ -103,8 +130,14 @@ public class BookAnimationController : MonoBehaviour
 
     public IEnumerator CloseBookSequence()
     {
+        EnsureInitialized();
+
+        if (!isInitialized)
+            yield break;
+
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.ZoomingOut;
         yield return StartCoroutine(PlayFrames(zoomOutFrames, "ZoomOut"));
         currentState = BookAnimationState.Closing;
@@ -116,8 +149,14 @@ public class BookAnimationController : MonoBehaviour
 
     public IEnumerator FlipForwardSequence()
     {
+        EnsureInitialized();
+
+        if (!isInitialized)
+            yield break;
+
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.FlippingForward;
         yield return StartCoroutine(PlayFrames(flipForwardFrames, "FlipForward"));
 
@@ -127,8 +166,14 @@ public class BookAnimationController : MonoBehaviour
 
     public IEnumerator FlipBackwardSequence()
     {
+        EnsureInitialized();
+
+        if (!isInitialized)
+            yield break;
+
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.FlippingBackward;
         yield return StartCoroutine(PlayFrames(flipBackwardFrames, "FlipBackward"));
 
@@ -156,9 +201,22 @@ public class BookAnimationController : MonoBehaviour
     private void ShowStaticOpen()
     {
         if (bookOpenSprite != null)
+        {
             bookDisplay.sprite = bookOpenSprite;
+            SetBookDisplayScale(staticOpenScale);
+        }
         else
             Debug.LogWarning("BookAnimationController: bookOpenSprite not assigned!");
+    }
+
+    private void SetBookDisplayScale(Vector3 targetScale)
+    {
+        if (bookDisplay == null)
+            return;
+
+        RectTransform rectTransform = bookDisplay.rectTransform;
+        if (rectTransform != null)
+            rectTransform.localScale = targetScale;
     }
 
     public BookAnimationState GetCurrentState() => currentState;

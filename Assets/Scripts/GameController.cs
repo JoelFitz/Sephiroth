@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameController : MonoBehaviour
 {
@@ -11,9 +12,14 @@ public class GameController : MonoBehaviour
     public KeyCode toggleUIKey = KeyCode.Tab;
     public KeyCode testCollectKey = KeyCode.E;
 
+    [Header("Scene Behavior")]
+    [SerializeField] private string homeSceneName = "HomeScene";
+    [SerializeField] private bool forceQuestUIOnFirstHomeSceneLoad = true;
+
     public static GameController Instance { get; private set; }
 
     private bool isQuestUIVisible = true;
+    private bool hasForcedQuestUIOnFirstHomeSceneLoad;
 
     void Awake()
     {
@@ -24,6 +30,8 @@ public class GameController : MonoBehaviour
 
             if (questUI != null)
                 DontDestroyOnLoad(questUI);
+
+            SceneManager.sceneLoaded += OnSceneLoaded;
         }
         else
         {
@@ -56,6 +64,42 @@ public class GameController : MonoBehaviour
         {
             player = GameObject.FindWithTag("Player");
         }
+
+        EnsureQuestUIVisibleForInitialHomeScene();
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        EnsureQuestUIVisibleForInitialHomeScene(scene.name);
+    }
+
+    void EnsureQuestUIVisibleForInitialHomeScene()
+    {
+        EnsureQuestUIVisibleForInitialHomeScene(SceneManager.GetActiveScene().name);
+    }
+
+    void EnsureQuestUIVisibleForInitialHomeScene(string sceneName)
+    {
+        if (!forceQuestUIOnFirstHomeSceneLoad || hasForcedQuestUIOnFirstHomeSceneLoad)
+            return;
+
+        if (!string.Equals(sceneName, homeSceneName, System.StringComparison.Ordinal))
+            return;
+
+        if (questUI == null)
+            return;
+
+        questUI.SetActive(true);
+        isQuestUIVisible = true;
+        hasForcedQuestUIOnFirstHomeSceneLoad = true;
     }
 
     void Update()

@@ -1383,7 +1383,7 @@ MonoBehaviour:
       - <LinkedGenId>k__BackingField
       values:
       - t: 255
-        v: 4294967295
+        v: 30
       - t: 11
         v: -8420558124275990525
       - t: 11

@@ -653,10 +653,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DoorLevelTransition
   transitionData:
-    targetSceneName: ForestScene
+    targetSceneName: Level1
     useSceneBuildIndex: 0
-    targetSceneIndex: 1
-    playerSpawnPosition: {x: 151.698, y: 13.71, z: 152.92}
+    targetSceneIndex: 3
+    playerSpawnPosition: {x: 185.65375, y: 17.93, z: 105.50833}
     playerSpawnRotation: 0
     doorName: Home to Forest
     requiresKey: 0
@@ -3591,7 +3591,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &922452802
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3925,7 +3925,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!223 &981905316
 Canvas:
   m_ObjectHideFlags: 0
@@ -6359,7 +6359,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1638925767
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11255,6 +11255,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1973442619}
   - {fileID: 888084535}
   - {fileID: 651123300}
   - {fileID: 845995417}
@@ -11264,7 +11265,6 @@ RectTransform:
   - {fileID: 890132431}
   - {fileID: 159622801}
   - {fileID: 1155386642}
-  - {fileID: 1973442619}
   m_Father: {fileID: 981905319}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -11398,6 +11398,8 @@ MonoBehaviour:
   - {fileID: -150662104, guid: e2d25ea48f809584888dea67654a4fff, type: 3}
   bookOpenSprite: {fileID: 21300000, guid: 62e62eb951d0ef442ac99214a7962781, type: 3}
   frameRate: 12
+  animationScale: {x: 0.8, y: 0.8, z: 0.8}
+  staticOpenScale: {x: 1, y: 1, z: 1}
 --- !u!1 &1973442618
 GameObject:
   m_ObjectHideFlags: 0
@@ -12207,11 +12209,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1384ec927044c884abeb92c1257cf558, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  showQuestUIOnStart: 0
+  showQuestUIOnStart: 1
   questUI: {fileID: 922452801}
   player: {fileID: 2127117797}
   toggleUIKey: 109
   testCollectKey: 265
+  homeSceneName: HomeScene
+  forceQuestUIOnFirstHomeSceneLoad: 1
 --- !u!4 &2143510890
 Transform:
   m_ObjectHideFlags: 0
