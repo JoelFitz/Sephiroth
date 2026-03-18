@@ -30,6 +30,7 @@ public class Book3DInteraction : MonoBehaviour
     private bool isBookOpen = false;
     private Vector3 originalPosition;
     private AudioSource audioSource;
+    [SerializeField] private bool interactionEnabled = true;
 
     // Animation state
     private float bobTimer = 0f;
@@ -86,9 +87,19 @@ public class Book3DInteraction : MonoBehaviour
 
     void Update()
     {
+        if (!interactionEnabled)
+        {
+            if (playerInRange)
+            {
+                playerInRange = false;
+                UpdateInteractionUI();
+            }
+            return;
+        }
+
         CheckPlayerProximity();
         HandleVisualEffects();
-        HandleInput();
+        // Input handling is now in MushroomResearchBook to avoid duplicate calls
     }
 
     void CheckPlayerProximity()
@@ -206,6 +217,18 @@ public class Book3DInteraction : MonoBehaviour
     {
         isBookOpen = isOpen;
         UpdateInteractionUI();
+    }
+
+    public void SetInteractionEnabled(bool enabled)
+    {
+        interactionEnabled = enabled;
+
+        if (!interactionEnabled)
+        {
+            playerInRange = false;
+            isBookOpen = false;
+            UpdateInteractionUI();
+        }
     }
 
     void OnDrawGizmosSelected()

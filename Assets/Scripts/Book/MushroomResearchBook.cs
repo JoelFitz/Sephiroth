@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -28,6 +29,8 @@ public class MushroomResearchEntry
 
 public class MushroomResearchBook : MonoBehaviour
 {
+    private static readonly Dictionary<string, int> SessionCollectionCounts = new Dictionary<string, int>();
+
     [Header("3D Book Model")]
     public GameObject bookModel; // The 3D book mesh
     public Transform bookClosedPosition; // Where book sits in world
@@ -57,6 +60,9 @@ public class MushroomResearchBook : MonoBehaviour
     public GameObject interactionPrompt; // Small world space "Press E" text
     private Book3DInteraction bookInteraction;
 
+    [Header("2D Book Animation")]
+    public BookAnimationController bookAnimationController;
+
     [Header("Research Data")]
     public MushroomResearchEntry[] mushroomEntries;
 
@@ -67,6 +73,9 @@ public class MushroomResearchBook : MonoBehaviour
     private int currentPagePair = 0; // Which pair of pages we're viewing
     private Transform player;
     private Camera playerCamera;
+    [SerializeField] private bool builtInInputEnabled = true;
+    [SerializeField] private bool worldInteractionEnabled = true;
+    private Coroutine closeBookAnimationRoutine;
 
     // Page content
     private List<BookPagePair> bookPages = new List<BookPagePair>();
@@ -82,10 +91,36 @@ public class MushroomResearchBook : MonoBehaviour
         public Sprite rightImage;
     }
 
+    public static MushroomResearchBook Instance { get; private set; }
+
+    void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+
+            if (bookUICanvas != null)
+            {
+                DontDestroyOnLoad(bookUICanvas.gameObject);
+            }
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    void OnEnable()
+    {
+        RebindChildReferences();
+    }
+
     void Start()
     {
         bookInteraction = GetComponent<Book3DInteraction>();
 
+        RebindChildReferences();
 
         InitializeBook();
         SetupEventListeners();
@@ -106,6 +141,36 @@ public class MushroomResearchBook : MonoBehaviour
         }
     }
 
+    private void RebindChildReferences()
+    {
+        // Rebind bookAnimationController after scene transitions
+        if (bookAnimationController == null && bookUIPanel != null)
+        {
+            bookAnimationController = bookUIPanel.GetComponent<BookAnimationController>();
+            
+            if (bookAnimationController == null && bookUICanvas != null)
+            {
+                bookAnimationController = bookUICanvas.GetComponentInChildren<BookAnimationController>();
+            }
+
+            if (bookAnimationController == null)
+            {
+                Debug.LogWarning("MushroomResearchBook: BookAnimationController not found after scene transition. UI may not animate properly.");
+            }
+        }
+
+        // Reacquire player reference in case it was recreated
+        if (player == null || !player.gameObject.activeSelf)
+        {
+            GameObject playerObj = GameObject.FindWithTag("Player");
+            if (playerObj != null)
+            {
+                player = playerObj.transform;
+                playerCamera = Camera.main;
+            }
+        }
+    }
+
     void InitializeBook()
     {
         // Start with book closed and UI hidden
@@ -114,6 +179,9 @@ public class MushroomResearchBook : MonoBehaviour
 
         if (bookUICanvas != null)
             bookUICanvas.gameObject.SetActive(false);
+
+        if (bookUIPanel != null)
+            bookUIPanel.SetActive(false);
 
         if (interactionPrompt != null)
             interactionPrompt.SetActive(false);
@@ -124,10 +192,10 @@ public class MushroomResearchBook : MonoBehaviour
     void SetupEventListeners()
     {
         if (nextPageButton != null)
-            nextPageButton.onClick.AddListener(NextPage);
+            nextPageButton.onClick.AddListener(NextPageWithAnimation);
 
         if (previousPageButton != null)
-            previousPageButton.onClick.AddListener(PreviousPage);
+            previousPageButton.onClick.AddListener(PreviousPageWithAnimation);
 
         if (closeBookButton != null)
             closeBookButton.onClick.AddListener(CloseBook);
@@ -135,8 +203,15 @@ public class MushroomResearchBook : MonoBehaviour
 
     void Update()
     {
-        CheckPlayerProximity();
-        HandleInput();
+        if (worldInteractionEnabled)
+            CheckPlayerProximity();
+        else if (interactionPrompt != null && interactionPrompt.activeSelf)
+            interactionPrompt.SetActive(false);
+
+        if (builtInInputEnabled)
+            HandleInteractionInput();
+
+        HandlePageNavigationInput();
     }
 
     void CheckPlayerProximity()
@@ -154,7 +229,7 @@ public class MushroomResearchBook : MonoBehaviour
         }
     }
 
-    void HandleInput()
+    void HandleInteractionInput()
     {
         if (Input.GetKeyDown(interactKey))
         {
@@ -167,14 +242,17 @@ public class MushroomResearchBook : MonoBehaviour
                 CloseBook();
             }
         }
+    }
 
-        // Keyboard navigation when book is open
+    void HandlePageNavigationInput()
+    {
+        // Keep page navigation active while the book is open, even when unified menu owns open/close input.
         if (isBookOpen)
         {
             if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
-                PreviousPage();
+                PreviousPageWithAnimation();
             else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
-                NextPage();
+                NextPageWithAnimation();
         }
     }
 
@@ -182,27 +260,47 @@ public class MushroomResearchBook : MonoBehaviour
     {
         if (isBookOpen) return;
 
+        RebindChildReferences();
+
+        if (closeBookAnimationRoutine != null)
+        {
+            StopCoroutine(closeBookAnimationRoutine);
+            closeBookAnimationRoutine = null;
+        }
+
         isBookOpen = true;
 
         // Notify interaction script
         if (bookInteraction != null)
             bookInteraction.OnBookStateChanged(true);
 
-
         // Hide interaction prompt
         if (interactionPrompt != null)
             interactionPrompt.SetActive(false);
 
-        // Move 3D book to open position (in front of camera)
-        if (bookModel != null && bookOpenPosition != null)
-        {
-            StartCoroutine(AnimateBookToPosition(bookOpenPosition.position, bookOpenPosition.rotation, 0.8f));
-        }
+        // Hide 3D book (replaced by 2D animations)
+        if (bookModel != null)
+            bookModel.SetActive(false);
 
-        // Show UI overlay
+        // Show the canvas first regardless of animation path
         if (bookUICanvas != null)
-        {
             bookUICanvas.gameObject.SetActive(true);
+
+        // Ensure the book UI panel/buttons are visible while open
+        if (bookUIPanel != null)
+            bookUIPanel.SetActive(true);
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // Play 2D animation sequence
+        if (bookAnimationController != null)
+        {
+            StartCoroutine(bookAnimationController.OpenBookSequence());
+        }
+        else
+        {
+            // No animation controller - canvas already shown above
         }
 
         // Start from first page
@@ -227,15 +325,22 @@ public class MushroomResearchBook : MonoBehaviour
         if (bookInteraction != null)
             bookInteraction.OnBookStateChanged(false);
 
-
-        // Hide UI
-        if (bookUICanvas != null)
-            bookUICanvas.gameObject.SetActive(false);
-
-        // Move 3D book back to world position
-        if (bookModel != null && bookClosedPosition != null)
+        // Play 2D close animation sequence
+        if (bookAnimationController != null)
         {
-            StartCoroutine(AnimateBookToPosition(bookClosedPosition.position, bookClosedPosition.rotation, 0.8f));
+            closeBookAnimationRoutine = StartCoroutine(CloseBookWithAnimation());
+        }
+        else
+        {
+            // Fallback: just hide the UI if no animation controller
+            if (bookUIPanel != null)
+                bookUIPanel.SetActive(false);
+
+            if (bookUICanvas != null)
+                bookUICanvas.gameObject.SetActive(false);
+            
+            if (bookModel != null)
+                bookModel.SetActive(true);
         }
 
         // Unlock player movement
@@ -243,7 +348,32 @@ public class MushroomResearchBook : MonoBehaviour
         if (playerController != null)
             playerController.enabled = true;
 
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         Debug.Log("📖 Research book closed!");
+    }
+
+    // Wrapper coroutine to handle close animation and show 3D book
+    private IEnumerator CloseBookWithAnimation()
+    {
+        yield return StartCoroutine(bookAnimationController.CloseBookSequence());
+
+        // Hide panel/buttons and canvas after close sequence completes.
+        if (bookUIPanel != null)
+            bookUIPanel.SetActive(false);
+
+        if (bookUICanvas != null)
+            bookUICanvas.gameObject.SetActive(false);
+        
+        // Show 3D book again after animations complete
+        if (bookModel != null)
+            bookModel.SetActive(true);
+
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+
+        closeBookAnimationRoutine = null;
     }
 
     System.Collections.IEnumerator AnimateBookToPosition(Vector3 targetPos, Quaternion targetRot, float duration)
@@ -276,6 +406,7 @@ public class MushroomResearchBook : MonoBehaviour
         if (entry != null)
         {
             entry.timesCollected++;
+            SessionCollectionCounts[mushroomType] = entry.timesCollected;
 
             bool wasDiscovered = entry.isDiscovered;
             entry.isDiscovered = true;
@@ -422,6 +553,47 @@ public class MushroomResearchBook : MonoBehaviour
         }
     }
 
+    // Wrapper methods for animation-aware page navigation
+    public void NextPageWithAnimation()
+    {
+        if (!isBookOpen || bookAnimationController == null)
+        {
+            NextPage();
+            return;
+        }
+
+        StartCoroutine(NextPageAnimationSequence());
+    }
+
+    public void PreviousPageWithAnimation()
+    {
+        if (!isBookOpen || bookAnimationController == null)
+        {
+            PreviousPage();
+            return;
+        }
+
+        StartCoroutine(PreviousPageAnimationSequence());
+    }
+
+    private IEnumerator NextPageAnimationSequence()
+    {
+        // Play flip forward animation
+        yield return StartCoroutine(bookAnimationController.FlipForwardSequence());
+        
+        // Update page content after animation
+        NextPage();
+    }
+
+    private IEnumerator PreviousPageAnimationSequence()
+    {
+        // Play flip backward animation
+        yield return StartCoroutine(bookAnimationController.FlipBackwardSequence());
+        
+        // Update page content after animation
+        PreviousPage();
+    }
+
     void UpdatePageDisplay()
     {
         if (currentPagePair >= bookPages.Count) return;
@@ -469,6 +641,9 @@ public class MushroomResearchBook : MonoBehaviour
 
     void SaveProgress()
     {
+        if (GameSessionManager.Instance != null && GameSessionManager.Instance.IsSessionActive)
+            return;
+
         foreach (var entry in mushroomEntries)
         {
             PlayerPrefs.SetInt($"Mushroom_{entry.mushroomType}_Discovered", entry.isDiscovered ? 1 : 0);
@@ -481,11 +656,25 @@ public class MushroomResearchBook : MonoBehaviour
     {
         discoveredMushrooms.Clear();
 
+        bool useSessionState = GameSessionManager.Instance != null && GameSessionManager.Instance.IsSessionActive;
+
         foreach (var entry in mushroomEntries)
         {
-            // Load from PlayerPrefs
-            bool savedDiscovered = PlayerPrefs.GetInt($"Mushroom_{entry.mushroomType}_Discovered", 0) == 1;
-            int savedCount = PlayerPrefs.GetInt($"Mushroom_{entry.mushroomType}_Count", 0);
+            bool savedDiscovered;
+            int savedCount;
+
+            if (useSessionState)
+            {
+                int sessionCount = 0;
+                SessionCollectionCounts.TryGetValue(entry.mushroomType, out sessionCount);
+                savedCount = sessionCount;
+                savedDiscovered = sessionCount > 0;
+            }
+            else
+            {
+                savedDiscovered = PlayerPrefs.GetInt($"Mushroom_{entry.mushroomType}_Discovered", 0) == 1;
+                savedCount = PlayerPrefs.GetInt($"Mushroom_{entry.mushroomType}_Count", 0);
+            }
 
             // Use inspector values as fallback/override for testing
             if (!savedDiscovered && entry.isDiscovered)
@@ -515,6 +704,35 @@ public class MushroomResearchBook : MonoBehaviour
         }
     }
 
+    public void ResetForNewGame()
+    {
+        CloseBook();
+        discoveredMushrooms.Clear();
+        isBookOpen = false;
+        isPlayerInRange = false;
+        currentPagePair = 0;
+        builtInInputEnabled = true;
+        worldInteractionEnabled = true;
+        bookPages.Clear();
+
+        if (bookUICanvas != null)
+            bookUICanvas.gameObject.SetActive(false);
+
+        if (bookUIPanel != null)
+            bookUIPanel.SetActive(false);
+
+        if (interactionPrompt != null)
+            interactionPrompt.SetActive(false);
+
+        ResetSessionResearchData();
+        Debug.Log("MushroomResearchBook: Reset for new game.");
+    }
+
+    public static void ResetSessionResearchData()
+    {
+        SessionCollectionCounts.Clear();
+    }
+
 
     void OnDrawGizmosSelected()
     {
@@ -526,5 +744,23 @@ public class MushroomResearchBook : MonoBehaviour
     {
         if (MailSystem.Instance != null)
             MailSystem.Instance.OnMushroomCollected -= OnMushroomCollected;
+    }
+
+    public bool IsBookOpen()
+    {
+        return isBookOpen;
+    }
+
+    public void SetBuiltInInputEnabled(bool enabled)
+    {
+        builtInInputEnabled = enabled;
+    }
+
+    public void SetWorldInteractionEnabled(bool enabled)
+    {
+        worldInteractionEnabled = enabled;
+
+        if (!worldInteractionEnabled && interactionPrompt != null)
+            interactionPrompt.SetActive(false);
     }
 }

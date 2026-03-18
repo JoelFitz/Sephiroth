@@ -40,6 +40,7 @@ public class InventorySystem : MonoBehaviour
     private InventoryItemUI draggedItemUI;
     private Vector2Int dragStartPosition;
     private bool isDragging = false;
+    [SerializeField] private bool builtInInputEnabled = true;
 
     // Singleton pattern
     public static InventorySystem Instance { get; private set; }
@@ -55,10 +56,33 @@ public class InventorySystem : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            if (inventoryCanvas != null)
+            {
+                DontDestroyOnLoad(inventoryCanvas.gameObject);
+            }
         }
         else
         {
             Destroy(gameObject);
+        }
+    }
+
+    void OnEnable()
+    {
+        // Rebind UI canvas and grid container after scene transitions
+        if (inventoryCanvas == null || gridContainer == null)
+        {
+            // Try to find canvas in inspector-assigned reference or search scene
+            if (inventoryCanvas == null)
+                inventoryCanvas = GetComponentInChildren<Canvas>();
+
+            // Try to find grid container
+            if (gridContainer == null && inventoryPanel != null)
+                gridContainer = inventoryPanel.GetComponentInChildren<GridLayoutGroup>()?.transform;
+                
+            if (gridContainer == null)
+                Debug.LogWarning("InventorySystem: gridContainer not found after scene transition.");
         }
     }
 
@@ -74,6 +98,9 @@ public class InventorySystem : MonoBehaviour
 
     void Update()
     {
+        if (!builtInInputEnabled)
+            return;
+
         HandleInput();
     }
 
@@ -165,6 +192,9 @@ public class InventorySystem : MonoBehaviour
 
     public void CloseInventory()
     {
+        if (inventoryCanvas == null)
+            return;
+
         isInventoryOpen = false;
         inventoryCanvas.gameObject.SetActive(false);
 
@@ -180,6 +210,36 @@ public class InventorySystem : MonoBehaviour
         DeselectItem();
 
         Debug.Log("📦 Inventory closed!");
+    }
+
+    public bool IsInventoryOpen()
+    {
+        return isInventoryOpen;
+    }
+
+    public void SetBuiltInInputEnabled(bool enabled)
+    {
+        builtInInputEnabled = enabled;
+    }
+
+    public void ResetForNewGame()
+    {
+        CloseInventory();
+        inventory = new InventoryGrid(inventorySize.x, inventorySize.y);
+        selectedItem = null;
+        draggedItemUI = null;
+        isDragging = false;
+        builtInInputEnabled = true;
+        isInventoryOpen = false;
+
+        // Clear the UI slots and regenerate from empty grid
+        foreach (Transform child in gridContainer)
+        {
+            Destroy(child.gameObject);
+        }
+        SetupUI();
+
+        Debug.Log("InventorySystem: Reset for new game.");
     }
 
     public bool AddMushroom(MushroomData mushroomData)

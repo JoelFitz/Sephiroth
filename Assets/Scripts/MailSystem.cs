@@ -32,6 +32,7 @@ public class MailSystem : MonoBehaviour
     private bool isMailOpen = false;
 
     public Button handInButton;
+    [SerializeField] private bool builtInInputEnabled = true;
 
     [Header("Reward Settings")]
     [SerializeField] private int rewardPointsPerQuest = 100;
@@ -86,16 +87,37 @@ public class MailSystem : MonoBehaviour
         }
     }
 
+    void OnEnable()
+    {
+        // Rebind mailUIPanel reference after scene transitions
+        if (mailUIPanel == null)
+        {
+            // Try to find it in children
+            if (transform.childCount > 0)
+            {
+                mailUIPanel = transform.GetChild(0).gameObject;
+            }
+        }
+    }
+
     void Start()
     {
         if (mailUIPanel != null)
             mailUIPanel.SetActive(false);
+
+        if (GameSessionManager.Instance != null && GameSessionManager.Instance.IsSessionActive)
+        {
+            currentDay = GameSessionManager.Instance.CurrentDay;
+        }
 
         GenerateTestQuest();
     }
 
     void Update()
     {
+        if (!builtInInputEnabled)
+            return;
+
         if (Input.GetKeyDown(toggleMailKey))
         {
             ToggleMailUI();
@@ -125,6 +147,48 @@ public class MailSystem : MonoBehaviour
         }
 
             Debug.Log(isMailOpen ? "📬 Mail opened!" : "📬 Mail closed!");
+    }
+
+    public void OpenMailUI()
+    {
+        if (isMailOpen)
+            return;
+
+        ToggleMailUI();
+    }
+
+    public void CloseMailUI()
+    {
+        if (!isMailOpen)
+            return;
+
+        ToggleMailUI();
+    }
+
+    public bool IsMailOpen()
+    {
+        return isMailOpen;
+    }
+
+    public void SetBuiltInInputEnabled(bool enabled)
+    {
+        builtInInputEnabled = enabled;
+    }
+
+    public void ResetForNewGame()
+    {
+        CloseMailUI();
+        activeQuests.Clear();
+        currentQuest = null;
+        totalUpgradePoints = 0;
+        currentDay = 1;
+        isMailOpen = false;
+        builtInInputEnabled = true;
+
+        if (mailUIPanel != null)
+            mailUIPanel.SetActive(false);
+
+        Debug.Log("MailSystem: Reset for new game.");
     }
 
     void GenerateTestQuest()
@@ -234,6 +298,12 @@ public class MailSystem : MonoBehaviour
     public void StartNewDay()
     {
         currentDay++;
+
+        if (GameSessionManager.Instance != null)
+        {
+            GameSessionManager.Instance.SetCurrentDay(currentDay);
+        }
+
         Debug.Log($"🌅 Day {currentDay} begins!");
 
         ClearOldQuests();
