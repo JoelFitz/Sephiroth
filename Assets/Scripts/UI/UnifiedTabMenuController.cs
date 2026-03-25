@@ -95,6 +95,17 @@ public class UnifiedTabMenuController : MonoBehaviour
         CloseAllPanels();
     }
 
+    public void OpenCategory(TabCategory category)
+    {
+        isMenuOpen = true;
+        ActivateCategory(category);
+    }
+
+    public void OpenQuestCategory()
+    {
+        OpenCategory(TabCategory.Quest);
+    }
+
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         EnsureEventSystem();
