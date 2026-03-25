@@ -26,6 +26,9 @@ public class RopeElevator : MonoBehaviour
     [Tooltip("Key the player must press while standing in the trigger to start riding.")]
     public KeyCode useKey = KeyCode.F;
 
+    [Tooltip("If enabled, this elevator ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
+    public bool useUnifiedTongueInput = true;
+
     [Tooltip("Maximum distance from the rope line (XZ) to allow starting the ride.")]
     public float allowedHorizontalOffset = 1.0f;
 
@@ -119,6 +122,9 @@ public class RopeElevator : MonoBehaviour
 
     void HandleInput()
     {
+        if (useUnifiedTongueInput)
+            return;
+
         if (Input.GetKeyDown(useKey))
         {
             // While attached to the elevator, pressing the key again detaches.
@@ -140,6 +146,9 @@ public class RopeElevator : MonoBehaviour
 
     void TryStartRideWithTongue()
     {
+        if (!playerInZone)
+            return;
+
         if (bottomPoint == null || topPoint == null)
         {
             Debug.LogWarning("RopeElevator requires both bottomPoint and topPoint assigned.");
@@ -434,6 +443,35 @@ public class RopeElevator : MonoBehaviour
     void StopRide()
     {
         DetachFromElevator();
+    }
+
+    public bool CanStartRide()
+    {
+        if (isRiding || ropeState == RopeState.Extending)
+            return false;
+
+        if (!playerInZone || playerTransform == null || elevatorAnchorPoint == null)
+            return false;
+
+        if (grappleSystem != null && grappleSystem.IsGrappling())
+            return false;
+
+        return true;
+    }
+
+    public bool TryUnifiedTongueAction()
+    {
+        if (isRiding)
+        {
+            DetachFromElevator();
+            return true;
+        }
+
+        if (!CanStartRide())
+            return false;
+
+        TryStartRideWithTongue();
+        return isRiding || ropeState == RopeState.Extending || ropeState == RopeState.Riding;
     }
 
     void AttachElevatorJoint()

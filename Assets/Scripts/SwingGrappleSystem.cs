@@ -30,6 +30,9 @@ public class SwingGrappleSystem : MonoBehaviour
     [Tooltip("Key to grab / release the rope.")]
     public KeyCode grappleKey = KeyCode.F;
 
+    [Tooltip("If enabled, this system ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
+    public bool useUnifiedTongueInput = true;
+
     [Header("Detection")]
     [Tooltip("Scan radius used when searching for SwingGrappleZones.")]
     public float detectionRadius = 12f;
@@ -227,6 +230,9 @@ public class SwingGrappleSystem : MonoBehaviour
 
     void HandleInput()
     {
+        if (useUnifiedTongueInput)
+            return;
+
         if (!Input.GetKeyDown(grappleKey)) return;
 
         switch (state)
@@ -608,6 +614,28 @@ public class SwingGrappleSystem : MonoBehaviour
 
     public bool IsSwinging()              => state != SwingState.Idle;
     public SwingGrappleZone CurrentZone() => currentZone;
+
+    public bool CanStartSwing()
+    {
+        return state == SwingState.Idle && currentZone != null;
+    }
+
+    public bool TryUnifiedTongueAction()
+    {
+        if (state == SwingState.Swinging)
+        {
+            ReleaseSwing(boosted: true);
+            return true;
+        }
+
+        if (CanStartSwing())
+        {
+            BeginSwing();
+            return true;
+        }
+
+        return false;
+    }
 
     void OnDestroy()
     {

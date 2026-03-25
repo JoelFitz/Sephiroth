@@ -30,8 +30,10 @@ public class FrogTongueController : MonoBehaviour
     public float terrainClearance = 0.04f;
 
     [Header("Input")]
-    public KeyCode extendKey = KeyCode.Q;
-    public KeyCode grabKey = KeyCode.E;
+    public KeyCode extendKey = KeyCode.Space;
+    public KeyCode grabKey = KeyCode.Space;
+    [Tooltip("If enabled, this controller ignores direct key polling and expects a unified input router to call TryUnifiedTongueAction().")]
+    public bool useUnifiedTongueInput = true;
 
     [Header("Attached Controls")]
     public int reelMouseButton = 0; // 0 = Left Mouse Button
@@ -277,6 +279,9 @@ public class FrogTongueController : MonoBehaviour
 
     void HandleInput()
     {
+        if (useUnifiedTongueInput)
+            return;
+
         if (Input.GetKeyDown(extendKey) && currentState == TongueState.Retracted)
             ExtendTongue();
 
@@ -405,7 +410,7 @@ public class FrogTongueController : MonoBehaviour
         InitializeWrapVisual(target);
         UpdateAttachmentJointToWrapContact();
 
-        Debug.Log($"Tongue attached to {target.name}! Press E to grab it.");
+        Debug.Log($"Tongue attached to {target.name}! Press Space to grab it.");
     }
 
     void HandleAttachedState()
@@ -452,7 +457,7 @@ public class FrogTongueController : MonoBehaviour
             float distanceToPlayer = Vector3.Distance(
                 attachedTarget.transform.position, transform.position);
             if (distanceToPlayer < 2f)
-                Debug.Log("Mushroom is close! Press E to grab it.");
+                Debug.Log("Mushroom is close! Press Space to grab it.");
         }
     }
 
@@ -947,6 +952,28 @@ public class FrogTongueController : MonoBehaviour
         }
         tongueSegmentObjects.Clear();
         tongueSegmentScripts.Clear();
+    }
+
+    public bool CanStartUnifiedAction()
+    {
+        return currentState == TongueState.Retracted;
+    }
+
+    public bool TryUnifiedTongueAction()
+    {
+        if (currentState == TongueState.Attached)
+        {
+            GrabAttachedTarget();
+            return true;
+        }
+
+        if (CanStartUnifiedAction())
+        {
+            ExtendTongue();
+            return true;
+        }
+
+        return false;
     }
 
     void OnDestroy()
