@@ -9,6 +9,8 @@ public class TongueGrappleSystem : MonoBehaviour
     public float grappleRange = 8f;
     public float grappleSpeed = 15f;
     public KeyCode grappleKey = KeyCode.Space;
+    [Tooltip("If enabled, this system ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
+    public bool useUnifiedTongueInput = true;
 
     [Header("Tongue Visuals")]
     public GameObject tongueSegmentPrefab;
@@ -251,6 +253,9 @@ public class TongueGrappleSystem : MonoBehaviour
 
     void HandleInput()
     {
+        if (useUnifiedTongueInput)
+            return;
+
         if (Input.GetKeyDown(grappleKey))
         {
             Debug.Log($"Grapple key pressed! Current state: {currentState}");
@@ -588,6 +593,28 @@ public class TongueGrappleSystem : MonoBehaviour
     public GrappleZone GetCurrentGrappleZone()
     {
         return currentGrappleZone;
+    }
+
+    public bool CanStartUnifiedAction()
+    {
+        return currentState == GrappleState.Ready && currentGrappleZone != null;
+    }
+
+    public bool TryUnifiedTongueAction()
+    {
+        if (currentState == GrappleState.Attached || currentState == GrappleState.Swinging)
+        {
+            ReleaseGrapple();
+            return true;
+        }
+
+        if (CanStartUnifiedAction())
+        {
+            StartGrapple();
+            return true;
+        }
+
+        return false;
     }
 
     void OnDestroy()

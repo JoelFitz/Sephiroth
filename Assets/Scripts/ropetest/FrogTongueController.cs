@@ -19,16 +19,46 @@ public class FrogTongueController : MonoBehaviour
     [Header("Physics Settings")]
     public float springForce = 80f;
     public float springDamper = 10f;
+    public float targetPullForce = 25f;
+
+    [Header("Terrain Collision")]
+    [Tooltip("Layers treated as terrain/ground for anti-clipping correction.")]
+    public LayerMask terrainCollisionMask;
+    [Tooltip("Height above the point used when probing terrain with a downward ray.")]
+    public float terrainProbeHeight = 20f;
+    [Tooltip("Small offset above terrain to avoid z-fighting/penetration.")]
+    public float terrainClearance = 0.04f;
 
     [Header("Input")]
-    public KeyCode extendKey = KeyCode.Q;
-    public KeyCode grabKey = KeyCode.E;
+    public KeyCode extendKey = KeyCode.Space;
+    public KeyCode grabKey = KeyCode.Space;
+    [Tooltip("If enabled, this controller ignores direct key polling and expects a unified input router to call TryUnifiedTongueAction().")]
+    public bool useUnifiedTongueInput = true;
+
+    [Header("Attached Controls")]
+    public int reelMouseButton = 0; // 0 = Left Mouse Button
+    public int releaseMouseButton = 1; // 1 = Right Mouse Button
 
     [Header("Visual")]
     public Material tongueMaterial;
 
+    [Header("Wrap Visual")]
+    public bool enableWrapVisual = true;
+    [Range(8, 64)] public int wrapArcSegments = 20;
+    [Range(0.1f, 1.5f)] public float wrapRadiusMultiplier = 0.6f;
+    public float minWrapRadius = 0.12f;
+    public float maxWrapRadius = 1.4f;
+    public float wrapRingWidth = 0.05f;
+    public bool debugWrapGizmos = false;
+
     [Header("Anchor Point")]
     public Transform tongueAnchor; // Frog's mouth position
+
+    [Header("Character Visuals")]
+    [Tooltip("Character transform to rotate while attached so the mouth faces the mushroom/ring contact.")]
+    public Transform characterVisual;
+    public float characterRotateSpeed = 8f;
+    public Vector3 visualRotationOffset = Vector3.zero;
 
     private List<GameObject> tongueSegmentObjects = new List<GameObject>();
     private List<RopeSegment> tongueSegmentScripts = new List<RopeSegment>();
@@ -44,10 +74,27 @@ public class FrogTongueController : MonoBehaviour
 
     private GameObject attachedTarget;
     private MushroomAI attachedMushroomAI;
+    private Rigidbody attachedTargetRigidbody;
+    private bool attachedTargetWasKinematic;
+    private bool attachedTargetUsedGravity;
+    private bool hasAttachedTargetPhysicsState;
     private SpringJoint attachmentJoint;
     private Vector3 tongueDirection;
     private float currentTongueLength;
     private int activeSegments;
+
+    // Visual-only ring wrap state around attached targets.
+    private bool wrapVisualActive;
+    private Vector3 wrapCenter;
+    private Vector3 wrapNormal;
+    private Vector3 wrapAxisX;
+    private Vector3 wrapAxisY;
+    private float wrapRadius;
+    private LineRenderer wrapRingRenderer;
+    private bool hasWrapContactPoint;
+    private Vector3 wrapContactWorldPoint;
+    private Quaternion preAttachLocalRotation;
+    private bool restoringRotation;
 
     void Start()
     {
@@ -108,6 +155,33 @@ public class FrogTongueController : MonoBehaviour
         tongueRenderer.receiveShadows = false;
         tongueRenderer.sortingOrder = 100;
         tongueRenderer.enabled = true;
+
+        SetupWrapRingRenderer();
+    }
+
+    void SetupWrapRingRenderer()
+    {
+        if (wrapRingRenderer != null)
+            return;
+
+        GameObject ringObj = new GameObject("TongueWrapRingVisual");
+        ringObj.transform.SetParent(transform);
+
+        wrapRingRenderer = ringObj.AddComponent<LineRenderer>();
+        wrapRingRenderer.useWorldSpace = true;
+        wrapRingRenderer.loop = true;
+        wrapRingRenderer.positionCount = 0;
+        wrapRingRenderer.startWidth = wrapRingWidth;
+        wrapRingRenderer.endWidth = wrapRingWidth;
+        wrapRingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        wrapRingRenderer.receiveShadows = false;
+        wrapRingRenderer.sortingOrder = 101;
+        wrapRingRenderer.enabled = false;
+
+        if (tongueMaterial != null)
+            wrapRingRenderer.material = tongueMaterial;
+        else
+            wrapRingRenderer.material = tongueRenderer.material;
     }
 
     void CreateTongue()
@@ -192,6 +266,7 @@ public class FrogTongueController : MonoBehaviour
         UpdateAnchorPosition();
         UpdateTongueState();
         UpdateVisualTongue();
+        UpdateCharacterRotation();
     }
 
     void UpdateAnchorPosition()
@@ -204,11 +279,20 @@ public class FrogTongueController : MonoBehaviour
 
     void HandleInput()
     {
+        if (useUnifiedTongueInput)
+            return;
+
         if (Input.GetKeyDown(extendKey) && currentState == TongueState.Retracted)
             ExtendTongue();
 
         if (Input.GetKeyDown(grabKey) && currentState == TongueState.Attached)
             GrabAttachedTarget();
+
+        if (currentState == TongueState.Attached && Input.GetMouseButtonDown(releaseMouseButton))
+        {
+            ReleaseMushroom();
+            currentState = TongueState.Retracting;
+        }
     }
 
     void ExtendTongue()
@@ -251,6 +335,7 @@ public class FrogTongueController : MonoBehaviour
                 tongueSegmentObjects[i].SetActive(true);
                 Vector3 segmentPos = anchorObject.transform.position +
                                      tongueDirection * (i + 1) * segmentLength;
+                segmentPos = KeepPointAboveTerrain(segmentPos);
                 tongueSegmentObjects[i].transform.position = segmentPos;
             }
         }
@@ -291,6 +376,12 @@ public class FrogTongueController : MonoBehaviour
         attachedMushroomAI = target.GetComponent<MushroomAI>();
         currentState = TongueState.Attached;
 
+        if (characterVisual != null)
+        {
+            preAttachLocalRotation = characterVisual.localRotation;
+            restoringRotation = false;
+        }
+
         if (attachedMushroomAI != null)
         {
             attachedMushroomAI.SetTongueGrabbed(true);
@@ -302,17 +393,24 @@ public class FrogTongueController : MonoBehaviour
             GameObject tongueTip = tongueSegmentObjects[activeSegments - 1];
             attachmentJoint = tongueTip.AddComponent<SpringJoint>();
 
-            Rigidbody targetRb = target.GetComponent<Rigidbody>();
-            if (targetRb == null)
-                targetRb = target.AddComponent<Rigidbody>();
+            attachedTargetRigidbody = target.GetComponent<Rigidbody>();
+            if (attachedTargetRigidbody == null)
+                attachedTargetRigidbody = target.AddComponent<Rigidbody>();
 
-            attachmentJoint.connectedBody = targetRb;
+            CacheAndPrepareAttachedTargetPhysics(attachedTargetRigidbody);
+
+            attachmentJoint.connectedBody = attachedTargetRigidbody;
             attachmentJoint.spring = springForce * 1.5f;
             attachmentJoint.damper = springDamper;
-            attachmentJoint.autoConfigureConnectedAnchor = true;
+            attachmentJoint.autoConfigureConnectedAnchor = false;
+            attachmentJoint.anchor = Vector3.zero;
+            attachmentJoint.connectedAnchor = Vector3.zero;
         }
 
-        Debug.Log($"Tongue attached to {target.name}! Press E to grab it.");
+        InitializeWrapVisual(target);
+        UpdateAttachmentJointToWrapContact();
+
+        Debug.Log($"Tongue attached to {target.name}! Press Space to grab it.");
     }
 
     void HandleAttachedState()
@@ -324,7 +422,12 @@ public class FrogTongueController : MonoBehaviour
             return;
         }
 
-        if (attachmentJoint != null && activeSegments > 0)
+        UpdateWrapVisual();
+        UpdateAttachmentJointToWrapContact();
+
+        bool isReelHeld = Input.GetMouseButton(reelMouseButton);
+
+        if (isReelHeld && attachmentJoint != null && activeSegments > 0)
         {
             for (int i = activeSegments - 1; i >= 0; i--)
             {
@@ -336,9 +439,17 @@ public class FrogTongueController : MonoBehaviour
                         Vector3 directionToAnchor =
                             (anchorObject.transform.position - segmentRb.position).normalized;
                         segmentRb.AddForce(directionToAnchor * retractSpeed * 0.5f, ForceMode.Force);
+                        KeepRigidbodyAboveTerrain(segmentRb);
                     }
                 }
             }
+        }
+
+        if (isReelHeld && attachedTargetRigidbody != null)
+        {
+            Vector3 toAnchor = anchorObject.transform.position - attachedTargetRigidbody.position;
+            attachedTargetRigidbody.AddForce(toAnchor.normalized * targetPullForce, ForceMode.Acceleration);
+            KeepRigidbodyAboveTerrain(attachedTargetRigidbody);
         }
 
         if (attachedTarget != null)
@@ -346,7 +457,7 @@ public class FrogTongueController : MonoBehaviour
             float distanceToPlayer = Vector3.Distance(
                 attachedTarget.transform.position, transform.position);
             if (distanceToPlayer < 2f)
-                Debug.Log("Mushroom is close! Press E to grab it.");
+                Debug.Log("Mushroom is close! Press Space to grab it.");
         }
     }
 
@@ -378,7 +489,14 @@ public class FrogTongueController : MonoBehaviour
             attachmentJoint = null;
         }
 
+        RestoreAttachedTargetPhysics();
+        attachedTargetRigidbody = null;
+
         attachedTarget = null;
+        ClearWrapVisual();
+
+        if (characterVisual != null)
+            restoringRotation = true;
     }
 
     void HandleTongueRetraction()
@@ -399,6 +517,7 @@ public class FrogTongueController : MonoBehaviour
                 // current (shrinking) tongue length, not its original extend position.
                 Vector3 targetPos = anchorObject.transform.position +
                                     tongueDirection * (i + 1) * segmentLength;
+                targetPos = KeepPointAboveTerrain(targetPos);
 
                 Rigidbody segmentRb = tongueSegmentObjects[i].GetComponent<Rigidbody>();
                 if (segmentRb != null)
@@ -454,21 +573,32 @@ public class FrogTongueController : MonoBehaviour
                     ? anchorObject.transform.position
                     : tongueSegmentObjects[i - 1].transform.position;
 
+                startPos = KeepPointAboveTerrain(startPos);
+                Vector3 endPos = KeepPointAboveTerrain(tongueSegmentObjects[i].transform.position);
+
+                // Force the final visual segment to terminate exactly at the wrap
+                // contact point so it does not visually split from the ring.
+                if (currentState == TongueState.Attached && i == activeSegments - 1 && hasWrapContactPoint)
+                    endPos = KeepPointAboveTerrain(wrapContactWorldPoint);
+
                 segmentLR.positionCount = 2;
                 segmentLR.SetPosition(0, startPos);
-                segmentLR.SetPosition(1, tongueSegmentObjects[i].transform.position);
+                segmentLR.SetPosition(1, endPos);
             }
         }
 
         List<Vector3> positions = new List<Vector3>();
         if (activeSegments > 0)
         {
-            positions.Add(anchorObject.transform.position);
+            positions.Add(KeepPointAboveTerrain(anchorObject.transform.position));
             for (int i = 0; i < activeSegments && i < tongueSegmentObjects.Count; i++)
             {
                 if (tongueSegmentObjects[i].activeInHierarchy)
-                    positions.Add(tongueSegmentObjects[i].transform.position);
+                    positions.Add(KeepPointAboveTerrain(tongueSegmentObjects[i].transform.position));
             }
+
+            if (currentState == TongueState.Attached && hasWrapContactPoint)
+                positions.Add(KeepPointAboveTerrain(wrapContactWorldPoint));
         }
 
         tongueRenderer.positionCount = positions.Count;
@@ -483,6 +613,336 @@ public class FrogTongueController : MonoBehaviour
         }
     }
 
+    void InitializeWrapVisual(GameObject target)
+    {
+        wrapVisualActive = false;
+        hasWrapContactPoint = false;
+        SetupWrapRingRenderer();
+
+        if (!enableWrapVisual || target == null)
+        {
+            if (wrapRingRenderer != null)
+                wrapRingRenderer.enabled = false;
+            return;
+        }
+
+        if (!TryGetWrapCenter(target, out wrapCenter))
+            return;
+
+        Vector3 targetUp = target.transform.up;
+        wrapNormal = targetUp.sqrMagnitude > 0.0001f ? targetUp.normalized : Vector3.up;
+
+        Bounds visualBounds;
+        if (TryGetVisualBounds(target, out visualBounds))
+            wrapRadius = ComputeWrapRadiusFromBounds(visualBounds, wrapCenter, wrapNormal);
+        else
+            wrapRadius = minWrapRadius;
+
+        wrapRadius = Mathf.Clamp(wrapRadius, minWrapRadius, maxWrapRadius);
+
+        Vector3 tipPos = GetCurrentTongueTipPosition();
+        Vector3 toTipOnPlane = Vector3.ProjectOnPlane(tipPos - wrapCenter, wrapNormal);
+        if (toTipOnPlane.sqrMagnitude < 0.0001f)
+            toTipOnPlane = Vector3.ProjectOnPlane(target.transform.right, wrapNormal);
+        if (toTipOnPlane.sqrMagnitude < 0.0001f)
+            toTipOnPlane = Vector3.ProjectOnPlane(Vector3.forward, wrapNormal);
+
+        wrapAxisX = toTipOnPlane.normalized;
+        wrapAxisY = Vector3.Cross(wrapNormal, wrapAxisX).normalized;
+
+        if (wrapAxisX.sqrMagnitude < 0.0001f || wrapAxisY.sqrMagnitude < 0.0001f)
+            return;
+
+        wrapVisualActive = true;
+        RenderWrapRing();
+    }
+
+    void UpdateWrapVisual()
+    {
+        if (!wrapVisualActive || attachedTarget == null)
+            return;
+
+        if (!TryGetWrapCenter(attachedTarget, out wrapCenter))
+        {
+            wrapVisualActive = false;
+            return;
+        }
+
+        Vector3 targetUp = attachedTarget.transform.up;
+        wrapNormal = targetUp.sqrMagnitude > 0.0001f ? targetUp.normalized : Vector3.up;
+
+        Bounds visualBounds;
+        if (TryGetVisualBounds(attachedTarget, out visualBounds))
+        {
+            float computedRadius = ComputeWrapRadiusFromBounds(visualBounds, wrapCenter, wrapNormal);
+            wrapRadius = Mathf.Clamp(computedRadius, minWrapRadius, maxWrapRadius);
+        }
+
+        Vector3 tipPos = GetCurrentTongueTipPosition();
+        Vector3 toTipOnPlane = Vector3.ProjectOnPlane(tipPos - wrapCenter, wrapNormal);
+        if (toTipOnPlane.sqrMagnitude > 0.0001f)
+        {
+            wrapAxisX = toTipOnPlane.normalized;
+            wrapAxisY = Vector3.Cross(wrapNormal, wrapAxisX).normalized;
+        }
+
+        wrapContactWorldPoint = GetWrapContactPoint(GetCurrentTongueTipPosition());
+        hasWrapContactPoint = true;
+
+        RenderWrapRing();
+    }
+
+    void ClearWrapVisual()
+    {
+        wrapVisualActive = false;
+        wrapCenter = Vector3.zero;
+        wrapNormal = Vector3.up;
+        wrapAxisX = Vector3.right;
+        wrapAxisY = Vector3.forward;
+        wrapRadius = minWrapRadius;
+        hasWrapContactPoint = false;
+        wrapContactWorldPoint = Vector3.zero;
+
+        if (wrapRingRenderer != null)
+        {
+            wrapRingRenderer.positionCount = 0;
+            wrapRingRenderer.enabled = false;
+        }
+    }
+
+    bool TryGetWrapCenter(GameObject target, out Vector3 center)
+    {
+        Bounds bounds;
+        if (TryGetVisualBounds(target, out bounds))
+        {
+            center = bounds.center;
+            return true;
+        }
+
+        center = target.transform.position;
+        return true;
+    }
+
+    bool TryGetVisualBounds(GameObject target, out Bounds bounds)
+    {
+        Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
+        bool hasBounds = false;
+        bounds = new Bounds(target.transform.position, Vector3.zero);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (hasBounds)
+            return true;
+
+        Collider[] colliders = target.GetComponentsInChildren<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider col = colliders[i];
+            if (col == null || !col.enabled)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = col.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(col.bounds);
+            }
+        }
+
+        return hasBounds;
+    }
+
+    float ComputeWrapRadiusFromBounds(Bounds bounds, Vector3 center, Vector3 planeNormal)
+    {
+        Vector3 ext = bounds.extents;
+        Vector3 boundsCenter = bounds.center;
+        Vector3[] corners = new Vector3[8]
+        {
+            boundsCenter + new Vector3( ext.x,  ext.y,  ext.z),
+            boundsCenter + new Vector3( ext.x,  ext.y, -ext.z),
+            boundsCenter + new Vector3( ext.x, -ext.y,  ext.z),
+            boundsCenter + new Vector3( ext.x, -ext.y, -ext.z),
+            boundsCenter + new Vector3(-ext.x,  ext.y,  ext.z),
+            boundsCenter + new Vector3(-ext.x,  ext.y, -ext.z),
+            boundsCenter + new Vector3(-ext.x, -ext.y,  ext.z),
+            boundsCenter + new Vector3(-ext.x, -ext.y, -ext.z)
+        };
+
+        float maxProjectedDistance = 0f;
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Vector3 onPlane = Vector3.ProjectOnPlane(corners[i] - center, planeNormal);
+            float dist = onPlane.magnitude;
+            if (dist > maxProjectedDistance)
+                maxProjectedDistance = dist;
+        }
+
+        return maxProjectedDistance * wrapRadiusMultiplier;
+    }
+
+    Vector3 GetCurrentTongueTipPosition()
+    {
+        if (activeSegments > 0 && activeSegments - 1 < tongueSegmentObjects.Count)
+        {
+            GameObject tip = tongueSegmentObjects[activeSegments - 1];
+            if (tip != null)
+                return tip.transform.position;
+        }
+
+        return anchorObject != null ? anchorObject.transform.position : transform.position;
+    }
+
+    Vector3 GetWrapContactPoint(Vector3 referenceWorldPos)
+    {
+        if (!wrapVisualActive)
+            return wrapCenter;
+
+        Vector3 toRefOnPlane = Vector3.ProjectOnPlane(referenceWorldPos - wrapCenter, wrapNormal);
+        if (toRefOnPlane.sqrMagnitude < 0.0001f)
+            toRefOnPlane = wrapAxisX;
+
+        Vector3 dir = toRefOnPlane.normalized;
+        return KeepPointAboveTerrain(wrapCenter + dir * wrapRadius);
+    }
+
+    void UpdateAttachmentJointToWrapContact()
+    {
+        if (attachmentJoint == null || attachedTargetRigidbody == null)
+            return;
+
+        Vector3 tipPos = GetCurrentTongueTipPosition();
+
+        if (wrapVisualActive)
+        {
+            wrapContactWorldPoint = GetWrapContactPoint(tipPos);
+            hasWrapContactPoint = true;
+
+            attachmentJoint.autoConfigureConnectedAnchor = false;
+            Vector3 safeContact = KeepPointAboveTerrain(wrapContactWorldPoint);
+            wrapContactWorldPoint = safeContact;
+            attachmentJoint.connectedAnchor = attachedTargetRigidbody.transform.InverseTransformPoint(safeContact);
+        }
+        else
+        {
+            hasWrapContactPoint = false;
+            attachmentJoint.autoConfigureConnectedAnchor = true;
+        }
+    }
+
+    void RenderWrapRing()
+    {
+        if (wrapRingRenderer == null)
+            return;
+
+        if (!enableWrapVisual || !wrapVisualActive || currentState != TongueState.Attached)
+        {
+            wrapRingRenderer.enabled = false;
+            return;
+        }
+
+        if (wrapArcSegments < 3 || wrapRadius <= 0f)
+        {
+            wrapRingRenderer.enabled = false;
+            return;
+        }
+
+        int ringPoints = wrapArcSegments;
+        wrapRingRenderer.positionCount = ringPoints;
+        wrapRingRenderer.startWidth = wrapRingWidth;
+        wrapRingRenderer.endWidth = wrapRingWidth;
+        wrapRingRenderer.enabled = true;
+
+        for (int i = 0; i < ringPoints; i++)
+        {
+            float angle = (Mathf.PI * 2f * i) / ringPoints;
+            Vector3 ringPoint = wrapCenter +
+                                (wrapAxisX * Mathf.Cos(angle) + wrapAxisY * Mathf.Sin(angle)) * wrapRadius;
+            wrapRingRenderer.SetPosition(i, KeepPointAboveTerrain(ringPoint));
+        }
+
+        // Snap one ring vertex directly to the active contact point so the
+        // tongue endpoint and ring share the exact same world position.
+        if (hasWrapContactPoint)
+            wrapRingRenderer.SetPosition(0, KeepPointAboveTerrain(wrapContactWorldPoint));
+    }
+
+    Vector3 KeepPointAboveTerrain(Vector3 point)
+    {
+        if (terrainCollisionMask.value == 0)
+            return point;
+
+        float castDistance = terrainProbeHeight * 2f + 2f;
+        Vector3 castOrigin = point + Vector3.up * terrainProbeHeight;
+
+        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, castDistance,
+                            terrainCollisionMask, QueryTriggerInteraction.Ignore))
+        {
+            float minY = hit.point.y + terrainClearance;
+            if (point.y < minY)
+                point.y = minY;
+        }
+
+        return point;
+    }
+
+    void KeepRigidbodyAboveTerrain(Rigidbody rb)
+    {
+        if (rb == null)
+            return;
+
+        Vector3 corrected = KeepPointAboveTerrain(rb.position);
+        if (corrected.y <= rb.position.y)
+            return;
+
+        rb.position = corrected;
+        if (rb.linearVelocity.y < 0f)
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+    }
+
+    void CacheAndPrepareAttachedTargetPhysics(Rigidbody targetRb)
+    {
+        if (targetRb == null)
+            return;
+
+        attachedTargetWasKinematic = targetRb.isKinematic;
+        attachedTargetUsedGravity = targetRb.useGravity;
+        hasAttachedTargetPhysicsState = true;
+
+        targetRb.isKinematic = false;
+        targetRb.useGravity = true;
+    }
+
+    void RestoreAttachedTargetPhysics()
+    {
+        if (!hasAttachedTargetPhysicsState || attachedTargetRigidbody == null)
+        {
+            hasAttachedTargetPhysicsState = false;
+            return;
+        }
+
+        attachedTargetRigidbody.isKinematic = attachedTargetWasKinematic;
+        attachedTargetRigidbody.useGravity = attachedTargetUsedGravity;
+        hasAttachedTargetPhysicsState = false;
+    }
+
     void DestroyTongue()
     {
         foreach (var segment in tongueSegmentObjects)
@@ -494,6 +954,28 @@ public class FrogTongueController : MonoBehaviour
         tongueSegmentScripts.Clear();
     }
 
+    public bool CanStartUnifiedAction()
+    {
+        return currentState == TongueState.Retracted;
+    }
+
+    public bool TryUnifiedTongueAction()
+    {
+        if (currentState == TongueState.Attached)
+        {
+            GrabAttachedTarget();
+            return true;
+        }
+
+        if (CanStartUnifiedAction())
+        {
+            ExtendTongue();
+            return true;
+        }
+
+        return false;
+    }
+
     void OnDestroy()
     {
         if (attachedTarget != null)
@@ -502,6 +984,48 @@ public class FrogTongueController : MonoBehaviour
         DestroyTongue();
         if (anchorObject != null)
             Destroy(anchorObject);
+        if (wrapRingRenderer != null)
+            Destroy(wrapRingRenderer.gameObject);
+    }
+
+    void UpdateCharacterRotation()
+    {
+        if (characterVisual == null)
+            return;
+
+        if (currentState == TongueState.Attached && attachedTarget != null)
+        {
+            restoringRotation = false;
+
+            Vector3 lookPoint = hasWrapContactPoint ? wrapContactWorldPoint : attachedTarget.transform.position;
+            Vector3 dirToTarget = (lookPoint - characterVisual.position).normalized;
+            if (dirToTarget.sqrMagnitude < 0.0001f)
+                return;
+
+            Vector3 upRef = Mathf.Abs(dirToTarget.y) > 0.98f
+                ? characterVisual.right
+                : Vector3.up;
+
+            Quaternion targetRot = Quaternion.LookRotation(dirToTarget, upRef)
+                                 * Quaternion.Euler(visualRotationOffset);
+            characterVisual.rotation = Quaternion.Slerp(
+                characterVisual.rotation,
+                targetRot,
+                Time.deltaTime * characterRotateSpeed);
+        }
+        else if (restoringRotation)
+        {
+            characterVisual.localRotation = Quaternion.Slerp(
+                characterVisual.localRotation,
+                preAttachLocalRotation,
+                Time.deltaTime * characterRotateSpeed);
+
+            if (Quaternion.Angle(characterVisual.localRotation, preAttachLocalRotation) < 0.5f)
+            {
+                characterVisual.localRotation = preAttachLocalRotation;
+                restoringRotation = false;
+            }
+        }
     }
 
     void OnDrawGizmos()
@@ -520,6 +1044,26 @@ public class FrogTongueController : MonoBehaviour
         {
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(anchorObject.transform.position, attachedTarget.transform.position);
+
+            if (debugWrapGizmos && wrapVisualActive)
+            {
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireSphere(wrapCenter, 0.05f);
+
+                int gizmoSteps = Mathf.Max(8, wrapArcSegments);
+                Vector3 prev = wrapCenter + wrapAxisX * wrapRadius;
+                for (int i = 1; i <= gizmoSteps; i++)
+                {
+                    float a = (Mathf.PI * 2f * i) / gizmoSteps;
+                    Vector3 next = wrapCenter +
+                                   (wrapAxisX * Mathf.Cos(a) + wrapAxisY * Mathf.Sin(a)) * wrapRadius;
+                    Gizmos.DrawLine(prev, next);
+                    prev = next;
+                }
+
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawLine(wrapCenter, wrapCenter + wrapNormal * (wrapRadius * 0.6f));
+            }
         }
     }
 }
