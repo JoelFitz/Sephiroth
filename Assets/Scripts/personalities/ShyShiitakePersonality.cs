@@ -132,7 +132,6 @@ public class ShyShiitakePersonality : MushroomPersonality
         }
         else if (toState == MushroomState.Idle)
         {
-            SnapToGround();
             proximityTimer = 0f;
             isBurrowing = false;
             isPoppingOut = false;
@@ -287,6 +286,7 @@ public class ShyShiitakePersonality : MushroomPersonality
             StopCoroutine(burrowCoroutine);
 
         mushroomAI.StopMushroom();
+        mushroomAI.BeginHideSequence();
 
         if (rb != null)
             rb.isKinematic = true;
@@ -299,6 +299,8 @@ public class ShyShiitakePersonality : MushroomPersonality
     {
         if (burrowCoroutine != null)
             StopCoroutine(burrowCoroutine);
+
+        mushroomAI.BeginEmergeSequence();
 
         if (rb != null)
             rb.isKinematic = true;
@@ -317,11 +319,6 @@ public class ShyShiitakePersonality : MushroomPersonality
         PlayRustleSound();
 
         float elapsedTime = 0f;
-        Vector3 startPos = transform.position;
-        Vector3 targetPos = new Vector3(startPos.x, GetGroundHeight(startPos) - data.hideDepth + groundOffset, startPos.z);
-
-        Transform modelTransform = mushroomAI.mushroomModel != null ? mushroomAI.mushroomModel.transform : transform;
-        Vector3 initialRotation = modelTransform.eulerAngles;
 
         while (elapsedTime < burrowTime)
         {
@@ -334,21 +331,9 @@ public class ShyShiitakePersonality : MushroomPersonality
             }
 
             elapsedTime += Time.deltaTime;
-            float progress = elapsedTime / burrowTime;
-
-            transform.position = Vector3.Lerp(startPos, targetPos, progress);
-
-            float spinRotation = spinSpeed * progress * (burrowTime / 360f) * 360f;
-            modelTransform.rotation = Quaternion.Euler(
-                initialRotation.x, initialRotation.y + spinRotation, initialRotation.z);
 
             yield return null;
         }
-
-        transform.position = targetPos;
-        float finalRotation = spinSpeed * (burrowTime / 360f) * 360f;
-        modelTransform.rotation = Quaternion.Euler(
-            initialRotation.x, initialRotation.y + finalRotation, initialRotation.z);
 
         isBurrowing = false;
         isFullyBurrowed = true;
@@ -367,11 +352,6 @@ public class ShyShiitakePersonality : MushroomPersonality
         PlayRustleSound();
 
         float elapsedTime = 0f;
-        Vector3 startPos = transform.position;
-        Vector3 targetPos = new Vector3(startPos.x, GetGroundHeight(startPos) + groundOffset, startPos.z);
-
-        Transform modelTransform = mushroomAI.mushroomModel != null ? mushroomAI.mushroomModel.transform : transform;
-        Vector3 initialRotation = modelTransform.eulerAngles;
 
         while (elapsedTime < popOutTime)
         {
@@ -384,20 +364,11 @@ public class ShyShiitakePersonality : MushroomPersonality
             }
 
             elapsedTime += Time.deltaTime;
-            float progress = elapsedTime / popOutTime;
-
-            float bounceProgress = Mathf.Pow(progress, 0.6f);
-            transform.position = Vector3.Lerp(startPos, targetPos, bounceProgress);
-
-            float spinRotation = -spinSpeed * 0.5f * progress * (popOutTime / 360f) * 360f;
-            modelTransform.rotation = Quaternion.Euler(
-                initialRotation.x, initialRotation.y + spinRotation, initialRotation.z);
 
             yield return null;
         }
 
-        transform.position = targetPos;
-        modelTransform.rotation = Quaternion.Euler(initialRotation);
+        SnapToGround();
 
         if (rb != null)
         {

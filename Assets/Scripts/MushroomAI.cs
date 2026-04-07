@@ -31,6 +31,7 @@ public class MushroomAI : MonoBehaviour
 
     // Components
     private MushroomPersonality personality;
+    private MushroomAnimationDriver animationDriver;
     private Collider mushroomCollider;
     private Rigidbody rb;
 
@@ -69,6 +70,27 @@ public class MushroomAI : MonoBehaviour
             Debug.Log($"Mushroom {name}: Model original local position = {modelOriginalLocalPosition}");
         }
 
+        if (animator == null && mushroomModel != null)
+        {
+            animator = mushroomModel.GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator != null)
+        {
+            animationDriver = GetComponent<MushroomAnimationDriver>();
+            if (animationDriver == null)
+            {
+                animationDriver = gameObject.AddComponent<MushroomAnimationDriver>();
+            }
+
+            animationDriver.Initialize(this, animator);
+        }
+
         // Load personality behavior
         if (mushroomData != null && mushroomData.personalityPrefab != null)
         {
@@ -95,11 +117,11 @@ public class MushroomAI : MonoBehaviour
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
         playerInRange = distanceToPlayer <= mushroomData.detectionRange;
 
-        // Debug logging
-        if (Time.frameCount % 60 == 0)
-        {
-            Debug.Log($"Mushroom {name}: Distance={distanceToPlayer:F1}, InRange={playerInRange}, State={currentState}");
-        }
+        // Debug logging disabled to reduce console noise.
+        // if (Time.frameCount % 60 == 0)
+        // {
+        //     Debug.Log($"Mushroom {name}: Distance={distanceToPlayer:F1}, InRange={playerInRange}, State={currentState}");
+        // }
     }
 
     void UpdateStateBehavior()
@@ -136,58 +158,7 @@ public class MushroomAI : MonoBehaviour
 
     void UpdateVisuals()
     {
-        if (mushroomModel == null) return;
-
-        switch (currentState)
-        {
-            case MushroomState.Hidden:
-                // Move model DOWN in LOCAL space
-                Vector3 hiddenLocalPos = modelOriginalLocalPosition + Vector3.down * mushroomData.hideDepth;
-
-                // Only lerp if not already at target
-                float distanceToHidden = Vector3.Distance(mushroomModel.transform.localPosition, hiddenLocalPos);
-                if (distanceToHidden > 0.01f)
-                {
-                    mushroomModel.transform.localPosition = Vector3.Lerp(
-                        mushroomModel.transform.localPosition,
-                        hiddenLocalPos,
-                        Time.deltaTime * mushroomData.hideSpeed);
-                }
-                else
-                {
-                    // Snap to exact position to stop drifting
-                    mushroomModel.transform.localPosition = hiddenLocalPos;
-                }
-                break;
-
-            case MushroomState.Idle:
-            case MushroomState.Alert:
-            case MushroomState.Fleeing:
-            case MushroomState.TongueGrabbed: 
-                                              
-
-                // Only lerp if not already at target
-                float distanceToOriginal = Vector3.Distance(mushroomModel.transform.localPosition, modelOriginalLocalPosition);
-                if (distanceToOriginal > 0.01f)
-                {
-                    mushroomModel.transform.localPosition = Vector3.Lerp(
-                        mushroomModel.transform.localPosition,
-                        modelOriginalLocalPosition,
-                        Time.deltaTime * mushroomData.hideSpeed);
-                }
-                else
-                {
-                    // Snap to exact position to stop drifting
-                    mushroomModel.transform.localPosition = modelOriginalLocalPosition;
-                }
-                break;
-        }
-
-        // animator setup for future states
-        if (animator != null)
-        {
-            animator.SetInteger("State", (int)currentState);
-        }
+        // Visual movement is now driven by the Animator clips.
     }
 
 
@@ -282,6 +253,22 @@ public class MushroomAI : MonoBehaviour
         if (rb != null)
         {
             rb.linearVelocity = new Vector3(direction.x * speed, rb.linearVelocity.y, direction.z * speed);
+        }
+    }
+
+    public void BeginHideSequence()
+    {
+        if (animationDriver != null)
+        {
+            animationDriver.BeginHideSequence();
+        }
+    }
+
+    public void BeginEmergeSequence()
+    {
+        if (animationDriver != null)
+        {
+            animationDriver.BeginEmergeSequence();
         }
     }
 
