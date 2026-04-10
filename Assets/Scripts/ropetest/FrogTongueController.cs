@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
 public class FrogTongueController : MonoBehaviour
@@ -108,6 +109,58 @@ public class FrogTongueController : MonoBehaviour
 
         if (tongueLayer != -1 && playerLayer != -1)
             Physics.IgnoreLayerCollision(tongueLayer, playerLayer, true);
+    }
+
+    void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResetTongueForSceneTransition();
+    }
+
+    void ResetTongueForSceneTransition()
+    {
+        playerTransform = transform;
+
+        if (anchorObject == null)
+            SetupTongueAnchor();
+
+        if (tongueRenderer == null)
+            SetupVisualTongue();
+
+        if (attachmentJoint != null)
+        {
+            Destroy(attachmentJoint);
+            attachmentJoint = null;
+        }
+
+        if (attachedMushroomAI != null)
+            attachedMushroomAI.SetTongueGrabbed(false);
+
+        RestoreAttachedTargetPhysics();
+
+        attachedTarget = null;
+        attachedMushroomAI = null;
+        attachedTargetRigidbody = null;
+        hasAttachedTargetPhysicsState = false;
+
+        currentState = TongueState.Retracted;
+        currentTongueLength = 0f;
+        activeSegments = 0;
+        tongueDirection = transform.forward;
+
+        ClearWrapVisual();
+
+        DestroyTongue();
+        CreateTongue();
     }
 
     void SetupTongueAnchor()
@@ -557,6 +610,9 @@ public class FrogTongueController : MonoBehaviour
 
     void UpdateVisualTongue()
     {
+        if (tongueRenderer == null || anchorObject == null)
+            return;
+
         for (int i = 0; i < tongueSegmentObjects.Count; i++)
         {
             if (tongueSegmentObjects[i] == null) continue;
@@ -593,7 +649,7 @@ public class FrogTongueController : MonoBehaviour
             positions.Add(KeepPointAboveTerrain(anchorObject.transform.position));
             for (int i = 0; i < activeSegments && i < tongueSegmentObjects.Count; i++)
             {
-                if (tongueSegmentObjects[i].activeInHierarchy)
+                if (tongueSegmentObjects[i] != null && tongueSegmentObjects[i].activeInHierarchy)
                     positions.Add(KeepPointAboveTerrain(tongueSegmentObjects[i].transform.position));
             }
 
