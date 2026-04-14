@@ -10,6 +10,13 @@ public class OverheadController : MonoBehaviour
     [Tooltip("Hold this key to sprint.")]
     public KeyCode sprintKey = KeyCode.LeftShift;
 
+    [Header("Jump")]
+    [Tooltip("Press this key to jump.")]
+    public KeyCode jumpKey = KeyCode.J;
+
+    [Tooltip("Approximate jump height used to derive the vertical launch speed.")]
+    public float jumpHeight = 1.5f;
+
     [Header("Camera Settings")]
     public Transform cameraTransform;
     public float cameraHeight = 15f;
@@ -64,6 +71,7 @@ public class OverheadController : MonoBehaviour
     private bool isGrounded;
     private Vector3 cameraOffset;
     private Vector3 cameraVelocity;
+    private FrogAnimationDriver frogAnimationDriver;
 
     private float currentCameraDistance;
     private float targetCameraDistance;
@@ -95,6 +103,8 @@ public class OverheadController : MonoBehaviour
         currentCameraAngle = 0f;
 
         SetupCamera();
+
+        EnsureFrogAnimationDriver();
 
         // Initial offset bake — camera not yet following, so direct call is fine here.
         CalculateCameraOffset();
@@ -145,6 +155,7 @@ public class OverheadController : MonoBehaviour
     {
         HandleGroundCheck();
         HandleMovement();
+        HandleJump();
         HandleCameraControls();
         HandleUpArrowAdjustment();   // updates cameraHeight/Angle/Distance targets only
         HandleSnapRotation();        // updates currentCameraAngle only
@@ -345,23 +356,46 @@ public class OverheadController : MonoBehaviour
             }
 
             if (playerMotor != null)
+            {
                 playerMotor.ApplyHorizontalVelocity(moveDirection * moveSpeed);
+                playerMotor.SetFacingDirection(moveDirection);
+            }
             else if (characterController != null)
                 characterController.Move(moveDirection * moveSpeed * Time.deltaTime);
 
             if (moveDirection != Vector3.zero)
             {
-                float targetAngle = Mathf.Atan2(moveDirection.x, moveDirection.z) * Mathf.Rad2Deg;
-                float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle,
-                                                     ref rotationVelocity, rotationSmoothTime);
-                transform.rotation = Quaternion.Euler(0f, angle, 0f);
+                if (playerMotor == null)
+                {
+                    float targetAngle = Mathf.Atan2(moveDirection.x, moveDirection.z) * Mathf.Rad2Deg;
+                    float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle,
+                                                         ref rotationVelocity, rotationSmoothTime);
+                    transform.rotation = Quaternion.Euler(0f, angle, 0f);
+                }
             }
         }
         else
         {
             if (playerMotor != null)
+            {
                 playerMotor.SetSprinting(false);
+                playerMotor.SetFacingDirection(Vector3.zero);
+            }
         }
+    }
+
+    void HandleJump()
+    {
+        if (!movementEnabled)
+            return;
+
+        if (playerMotor != null)
+            return;
+
+        if (!Input.GetKeyDown(jumpKey) || !isGrounded)
+            return;
+
+        velocity.y = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
     }
 
     void HandleCameraControls()
@@ -493,6 +527,19 @@ public class OverheadController : MonoBehaviour
     }
 
     public bool IsMovementEnabled() => movementEnabled;
+
+    void EnsureFrogAnimationDriver()
+    {
+        if (frogAnimationDriver == null)
+        {
+            frogAnimationDriver = GetComponent<FrogAnimationDriver>();
+        }
+
+        if (frogAnimationDriver == null)
+        {
+            frogAnimationDriver = gameObject.AddComponent<FrogAnimationDriver>();
+        }
+    }
 
     // ── Debug Gizmos ─────────────────────────────────────────────────────────
 
