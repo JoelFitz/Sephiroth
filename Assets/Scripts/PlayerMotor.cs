@@ -42,11 +42,16 @@ public class PlayerMotor : MonoBehaviour
     [Tooltip("Layer mask used for steep-wall detection. Should match your terrain/geometry layers.")]
     public LayerMask wallMask = ~0;
 
+    [Header("Facing")]
+    [Tooltip("How quickly the Rigidbody rotates toward the movement direction.")]
+    public float turnSpeed = 12f;
+
     private Rigidbody rb;
     private CapsuleCollider capsule;
     private bool movementEnabled = true;
     private bool isGrounded;
     private bool isSprinting;
+    private Vector3 desiredFacingDirection = Vector3.zero;
 
     void Awake()
     {
@@ -60,8 +65,8 @@ public class PlayerMotor : MonoBehaviour
         // Let Unity handle gravity; we only control horizontal velocity.
         rb.useGravity = true;
 
-        // Prevent physics from tipping the frog over; we rotate via transform instead.
-        rb.constraints = RigidbodyConstraints.FreezeRotation;
+        // Prevent physics from tipping the frog over while still allowing yaw rotation.
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
 
         // Enable interpolation so camera following the Rigidbody is smoother.
         rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -72,6 +77,12 @@ public class PlayerMotor : MonoBehaviour
     {
         UpdateGrounded();
         ApplyHorizontalDecelerationIfNeeded();
+        ApplyFacingRotation();
+
+        if (rb != null)
+        {
+            rb.angularVelocity = Vector3.zero;
+        }
     }
 
     void UpdateGrounded()
@@ -135,6 +146,32 @@ public class PlayerMotor : MonoBehaviour
         newHorizontal = BlockCliffVelocity(newHorizontal);
 
         rb.linearVelocity = new Vector3(newHorizontal.x, currentVelocity.y, newHorizontal.z);
+    }
+
+    public void SetFacingDirection(Vector3 direction)
+    {
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            desiredFacingDirection = Vector3.zero;
+            return;
+        }
+
+        desiredFacingDirection = direction.normalized;
+    }
+
+    private void ApplyFacingRotation()
+    {
+        if (!movementEnabled || rb == null)
+            return;
+
+        if (desiredFacingDirection.sqrMagnitude < 0.0001f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(desiredFacingDirection, Vector3.up);
+        Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, turnSpeed * Time.fixedDeltaTime);
+        rb.MoveRotation(newRotation);
     }
 
     // ─── Cliff / Steep-Wall Blocking ─────────────────────────────────────────
