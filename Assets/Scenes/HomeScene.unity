@@ -11932,10 +11932,29 @@ MonoBehaviour:
     m_Bits: 128
   springForce: 50
   springDamper: 8.54
+  targetPullForce: 25
+  terrainCollisionMask:
+    serializedVersion: 2
+    m_Bits: 0
+  terrainProbeHeight: 20
+  terrainClearance: 0.04
   extendKey: 113
   grabKey: 101
+  useUnifiedTongueInput: 1
+  reelMouseButton: 0
+  releaseMouseButton: 1
   tongueMaterial: {fileID: 0}
+  enableWrapVisual: 1
+  wrapArcSegments: 20
+  wrapRadiusMultiplier: 0.6
+  minWrapRadius: 0.12
+  maxWrapRadius: 1.4
+  wrapRingWidth: 0.05
+  debugWrapGizmos: 0
   tongueAnchor: {fileID: 141723508}
+  characterVisual: {fileID: 0}
+  characterRotateSpeed: 8
+  visualRotationOffset: {x: 0, y: 0, z: 0}
 --- !u!143 &2127117800
 CharacterController:
   m_ObjectHideFlags: 0
@@ -12017,11 +12036,13 @@ MonoBehaviour:
   moveSpeed: 5
   rotationSmoothTime: 0.1
   sprintKey: 304
+  jumpKey: 106
+  jumpHeight: 1.5
   cameraTransform: {fileID: 1837228657}
   cameraHeight: 1.5
   cameraAngle: 35
   cameraDistance: 5.02
-  useOrthographic: 0
+  useOrthographic: 1
   orthographicSize: 8
   useSnapRotation: 1
   snapRotationSpeed: 5
