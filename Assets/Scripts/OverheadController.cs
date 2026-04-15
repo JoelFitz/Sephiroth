@@ -434,7 +434,17 @@ public class OverheadController : MonoBehaviour
 //        }
     void HandleCameraControls()
     {
+        if (useMouseCameraRotation)
+        {
+            float mouseX = Input.GetAxis("Mouse X");
+            float mouseY = Input.GetAxis("Mouse Y");
 
+            if (Mathf.Abs(mouseX) > 0.00001f)
+                targetCameraAngle += mouseX * mouseCameraSensitivity;
+
+            if (Mathf.Abs(mouseY) > 0.0001f)
+                cameraAngle = Mathf.Clamp(cameraAngle - mouseY * mouseCameraSensitivity, mouseCameraPitchMin, mouseCameraPitchMax);
+        }
 
         if (allowCameraRotation && !useSnapRotation && !useMouseCameraRotation)
         {
