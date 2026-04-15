@@ -47,6 +47,9 @@ public class OverheadController : MonoBehaviour
     private bool isUpViewActive = false;
 
     private float currentCameraAngle = 0f;
+    private float currentCameraPitch = 0f;
+    private float cameraYawVelocity;
+    private float cameraPitchVelocity;
 
     [Header("Camera Collision")]
     public bool enableCameraCollision = true;
@@ -58,6 +61,11 @@ public class OverheadController : MonoBehaviour
     [Header("Camera Controls")]
     public bool allowCameraRotation = false;
     public float cameraRotationSpeed = 2f;
+    [SerializeField] private bool useMouseCameraRotation = false;
+    [SerializeField] private float mouseCameraSensitivity = 2f;
+    [SerializeField] private float mouseCameraPitchMin = 20f;
+    [SerializeField] private float mouseCameraPitchMax = 75f;
+    [SerializeField] private float cameraRotationSmoothTime = 0.08f;
 
     [Header("Camera Smoothing")]
     public float cameraFollowSpeed = 10f;
@@ -101,6 +109,7 @@ public class OverheadController : MonoBehaviour
         targetCameraDistance = cameraDistance;
         targetCameraAngle = 0f;
         currentCameraAngle = 0f;
+        currentCameraPitch = cameraAngle;
 
         SetupCamera();
 
@@ -132,7 +141,7 @@ public class OverheadController : MonoBehaviour
     // Never called mid-frame from Update — use LateUpdate path for that.
     void CalculateCameraOffset()
     {
-        Vector3 direction = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
+        Vector3 direction = Quaternion.Euler(currentCameraPitch, currentCameraAngle, 0) * Vector3.back;
         cameraOffset = direction * currentCameraDistance + Vector3.up * cameraHeight;
     }
 
@@ -145,7 +154,7 @@ public class OverheadController : MonoBehaviour
         cameraTransform.LookAt(transform.position + Vector3.up);
 
         Vector3 euler = cameraTransform.eulerAngles;
-        euler.x = cameraAngle;
+        euler.x = currentCameraPitch;
         cameraTransform.rotation = Quaternion.Euler(euler);
     }
 
@@ -175,6 +184,18 @@ public class OverheadController : MonoBehaviour
 
     void LateUpdate()
     {
+        if (useMouseCameraRotation)
+        {
+            currentCameraAngle = Mathf.SmoothDampAngle(
+                currentCameraAngle, targetCameraAngle, ref cameraYawVelocity, cameraRotationSmoothTime);
+            currentCameraPitch = Mathf.SmoothDampAngle(
+                currentCameraPitch, cameraAngle, ref cameraPitchVelocity, cameraRotationSmoothTime);
+        }
+        else
+        {
+            currentCameraPitch = cameraAngle;
+        }
+
         // 1. Smooth the collision-adjusted distance towards its target.
         currentCameraDistance = Mathf.SmoothDamp(
             currentCameraDistance, targetCameraDistance,
@@ -226,6 +247,8 @@ public class OverheadController : MonoBehaviour
     // Does NOT call CalculateCameraOffset — that happens in LateUpdate.
     void HandleSnapRotation()
     {
+        if (useMouseCameraRotation) return;
+
         if (!useSnapRotation) return;
 
         bool qPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
@@ -288,7 +311,7 @@ public class OverheadController : MonoBehaviour
     void CheckCameraCollision()
     {
         Vector3 playerPosition = transform.position;
-        Vector3 desiredCameraDirection = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
+        Vector3 desiredCameraDirection = Quaternion.Euler(currentCameraPitch, currentCameraAngle, 0) * Vector3.back;
         Vector3 desiredCameraPosition = playerPosition + desiredCameraDirection * cameraDistance + Vector3.up * cameraHeight;
 
         Vector3 rayDirection = (desiredCameraPosition - playerPosition).normalized;
@@ -344,7 +367,7 @@ public class OverheadController : MonoBehaviour
                 Vector3 cameraRight = new Vector3(Mathf.Cos(cameraRad), 0, -Mathf.Sin(cameraRad));
                 moveDirection = cameraForward * inputDirection.z + cameraRight * inputDirection.x;
             }
-            else if (allowCameraRotation)
+            else if (allowCameraRotation || useMouseCameraRotation)
             {
                 Vector3 cameraForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
                 Vector3 cameraRight = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
@@ -398,9 +421,22 @@ public class OverheadController : MonoBehaviour
         velocity.y = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
     }
 
+//        if (useMouseCameraRotation)
+//        {
+//            float mouseX = Input.GetAxis("Mouse X");
+//            float mouseY = Input.GetAxis("Mouse Y");
+//
+//            if (Mathf.Abs(mouseX) > 0.0001f)
+//                targetCameraAngle += mouseX * mouseCameraSensitivity;
+//
+//            if (Mathf.Abs(mouseY) > 0.0001f)
+//                cameraAngle = Mathf.Clamp(cameraAngle - mouseY * mouseCameraSensitivity, mouseCameraPitchMin, mouseCameraPitchMax);
+//        }
     void HandleCameraControls()
     {
-        if (allowCameraRotation && !useSnapRotation)
+
+
+        if (allowCameraRotation && !useSnapRotation && !useMouseCameraRotation)
         {
             if (Input.GetKey(KeyCode.Q)) RotateCamera(-cameraRotationSpeed * Time.deltaTime);
             if (Input.GetKey(KeyCode.E)) RotateCamera(cameraRotationSpeed * Time.deltaTime);
@@ -479,6 +515,7 @@ public class OverheadController : MonoBehaviour
         if (!isUpViewActive)
         {
             cameraAngle = angle;
+            currentCameraPitch = angle;
             // PositionCamera is only safe here if called outside of play-mode LateUpdate;
             // during play the LateUpdate path will correct it within one frame.
             CalculateCameraOffset();
@@ -548,7 +585,7 @@ public class OverheadController : MonoBehaviour
         if (!enableCameraCollision || cameraTransform == null) return;
 
         Vector3 playerPosition = transform.position;
-        Vector3 desiredCameraDirection = Quaternion.Euler(cameraAngle, currentCameraAngle, 0) * Vector3.back;
+        Vector3 desiredCameraDirection = Quaternion.Euler(currentCameraPitch, currentCameraAngle, 0) * Vector3.back;
         Vector3 desiredCameraPosition = playerPosition + desiredCameraDirection * cameraDistance + Vector3.up * cameraHeight;
 
         Gizmos.color = Color.yellow;
