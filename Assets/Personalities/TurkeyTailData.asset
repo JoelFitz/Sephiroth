@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b98339c711239be4aa0649ade0717284, type: 3}
-  m_Name: AggressiveChanterelleData
+  m_Name: TurkeyTailData
   m_EditorClassIdentifier: 
-  mushroomType: Shiitake
-  displayName: Shiitake Mushroom
-  rarity: 0
-  detectionRange: 7
-  personalityPrefab: {fileID: 8920490542265044307, guid: 1d2f959f170226d4c868935935acb2d7, type: 3}
-  hideSpeed: 2
-  hideDepth: 0
-  fleeSpeed: 7.41
+  mushroomType: Turkey Tail
+  displayName: Turkey Tail
+  rarity: 2
+  detectionRange: 12
+  personalityPrefab: {fileID: 4662773891547931110, guid: 95257ca6f5e44b8a9ca93826f78474c2, type: 3}
+  hideSpeed: 2.3
+  hideDepth: 0.42
+  fleeSpeed: 4.3
   mushroomPrefab: {fileID: 0}
   collectionEffect: {fileID: 0}
   rustleSounds: []

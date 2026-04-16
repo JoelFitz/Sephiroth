@@ -1,4 +1,8 @@
 ﻿using UnityEngine;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 public class OverheadController : MonoBehaviour
 {
@@ -73,6 +77,7 @@ public class OverheadController : MonoBehaviour
 
     private CharacterController characterController;
     private PlayerMotor playerMotor;
+    private Component playerHealthStatus;
     private Camera cam;
     private float rotationVelocity;
     private Vector3 velocity;
@@ -114,6 +119,7 @@ public class OverheadController : MonoBehaviour
         SetupCamera();
 
         EnsureFrogAnimationDriver();
+        EnsurePlayerHealthStatus();
 
         // Initial offset bake — camera not yet following, so direct call is fine here.
         CalculateCameraOffset();
@@ -585,6 +591,45 @@ public class OverheadController : MonoBehaviour
         if (frogAnimationDriver == null)
         {
             frogAnimationDriver = gameObject.AddComponent<FrogAnimationDriver>();
+        }
+    }
+
+    void EnsurePlayerHealthStatus()
+    {
+        if (playerHealthStatus == null)
+        {
+            playerHealthStatus = GetComponent("PlayerHealthStatus");
+        }
+
+        if (playerHealthStatus == null)
+        {
+            List<Type> allTypes = new List<Type>();
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                try
+                {
+                    allTypes.AddRange(assemblies[i].GetTypes());
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    if (ex.Types == null)
+                        continue;
+
+                    for (int j = 0; j < ex.Types.Length; j++)
+                    {
+                        Type t = ex.Types[j];
+                        if (t != null)
+                            allTypes.Add(t);
+                    }
+                }
+            }
+
+            Type healthType = allTypes
+                .FirstOrDefault(t => t != null && t.Name == "PlayerHealthStatus" && typeof(Component).IsAssignableFrom(t));
+
+            if (healthType != null)
+                playerHealthStatus = gameObject.AddComponent(healthType);
         }
     }
 

@@ -13,6 +13,9 @@ public abstract class MushroomPersonality : MonoBehaviour
 
     public abstract void UpdateBehavior();
 
+    // Allow AI-level ambient wandering while in Idle. Override to disable.
+    public virtual bool AllowAmbientIdleWander => true;
+
     public virtual void OnStateChanged(MushroomState fromState, MushroomState toState)
     {
         // Override THIS!!!

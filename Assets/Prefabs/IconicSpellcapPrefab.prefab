@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 397896813924509665}
   - component: {fileID: 3286011646191022719}
   m_Layer: 0
-  m_Name: AggressiveChanterellePrefab
+  m_Name: IconicSpellcapPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -48,4 +48,7 @@ MonoBehaviour:
   chaseTime: 5
   chaseSpeed: 6
   attackRange: 1.5
-  cooldownTime: 2
+  attackInterval: 2
+  damagePerHit: 30
+  hiddenCooldownTime: 2
+  stunRetreatTime: 1.25
