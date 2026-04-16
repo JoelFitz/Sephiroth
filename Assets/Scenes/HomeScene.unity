@@ -6730,10 +6730,10 @@ MonoBehaviour:
   interactionPrompt: {fileID: 0}
   bookAnimationController: {fileID: 1930987847}
   mushroomEntries:
-  - mushroomType: Shiitake
-    displayName: Shy Shiitake
+  - mushroomType: Sapphire Sprite
+    displayName: The Sapphire Sprite
     scientificName: Shiitakius Maximus
-    description: The Shy Shiitake likes to hide from terrifying frogs.
+    description: The Sapphire Sprite hides underground and runs from terrifying frogs.
     habitat: Loves to dwell in the forests.
     cookingNotes: Cook for 20 minutes, serve with radish.
     illustration: {fileID: 0}

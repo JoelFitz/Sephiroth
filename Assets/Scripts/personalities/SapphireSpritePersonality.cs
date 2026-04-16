@@ -1,9 +1,9 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
-public class ShyShiitakePersonality : MushroomPersonality
+public class SapphireSpritePersonality : MushroomPersonality
 {
-    [Header("Shy Behavior")]
+    [Header("Sapphire Sprite Behavior")]
     public float hideTime = 10000f;
     public float alertTime = 0.5f;
     public float fleeTime = 3f;
