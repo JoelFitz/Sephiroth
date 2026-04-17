@@ -1,9 +1,21 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System;
+using System.Linq;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class BookAnimationController : MonoBehaviour
 {
+    public enum FrameSourceMode
+    {
+        RuntimeLoadWithFallback,
+        InspectorOnly
+    }
+
     public enum BookAnimationState
     {
         Closed,
@@ -41,6 +53,15 @@ public class BookAnimationController : MonoBehaviour
     [Tooltip("Frames per second for all animations")]
     public float frameRate = 12f;
 
+    [Header("Runtime PNG Sequence Loading")]
+    [SerializeField] private FrameSourceMode frameSourceMode = FrameSourceMode.RuntimeLoadWithFallback;
+    [Tooltip("Resources root folder for frame sequences, e.g. 'animations/book/NewBook' if under a Resources folder.")]
+    [SerializeField] private string resourcesRoot = "animations/book/NewBook";
+    [Tooltip("When enabled, Unity Editor can load sprites directly from Assets if Resources loading fails.")]
+    [SerializeField] private bool allowEditorAssetDatabaseFallback = true;
+    [Tooltip("Asset path root used by editor fallback, e.g. 'Assets/animations/book/NewBook'.")]
+    [SerializeField] private string editorAssetRoot = "Assets/animations/book/NewBook";
+
     [Header("Scale Settings")]
     [Tooltip("Scale applied while playing frame-by-frame animations (open/zoom/flip/close)")]
     public Vector3 animationScale = Vector3.one;
@@ -50,6 +71,7 @@ public class BookAnimationController : MonoBehaviour
     private BookAnimationState currentState = BookAnimationState.Closed;
     private bool hasOpenedBefore = false;
     private bool isInitialized = false;
+    private bool hasAttemptedRuntimeLoad = false;
 
     void Awake()
     {
@@ -58,13 +80,26 @@ public class BookAnimationController : MonoBehaviour
 
     void OnEnable()
     {
+        // If references were lost (or assets were reimported), allow a fresh load attempt.
+        if (!HasCoreFramesAssigned())
+            hasAttemptedRuntimeLoad = false;
+
         EnsureInitialized();
+    }
+
+    private void OnValidate()
+    {
+        // Make sure inspector edits can trigger a fresh load pass.
+        if (!HasCoreFramesAssigned())
+            hasAttemptedRuntimeLoad = false;
     }
 
     private void EnsureInitialized()
     {
         if (isInitialized)
             return;
+
+        TryPopulateAnimationFrames();
 
         if (bookDisplay == null)
         {
@@ -94,8 +129,9 @@ public class BookAnimationController : MonoBehaviour
     void LateUpdate()
     {
         // If anything external changed the sprite while the book is open, enforce static open image.
-        if (currentState == BookAnimationState.Open && bookOpenSprite != null && bookDisplay != null && bookDisplay.sprite != bookOpenSprite)
-            bookDisplay.sprite = bookOpenSprite;
+        Sprite staticSprite = ResolveStaticOpenSprite();
+        if (currentState == BookAnimationState.Open && staticSprite != null && bookDisplay != null && bookDisplay.sprite != staticSprite)
+            bookDisplay.sprite = staticSprite;
     }
 
     public IEnumerator OpenBookSequence()
@@ -185,7 +221,8 @@ public class BookAnimationController : MonoBehaviour
     {
         if (frames == null || frames.Length == 0)
         {
-            Debug.LogWarning($"BookAnimationController: No frames assigned for '{animName}'");
+            if (animName.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) < 0)
+                Debug.LogWarning($"BookAnimationController: No frames assigned for '{animName}'");
             yield break;
         }
 
@@ -200,14 +237,120 @@ public class BookAnimationController : MonoBehaviour
 
     private void ShowStaticOpen()
     {
-        if (bookOpenSprite != null)
+        Sprite staticSprite = ResolveStaticOpenSprite();
+        if (staticSprite != null)
         {
-            bookDisplay.sprite = bookOpenSprite;
+            bookDisplay.sprite = staticSprite;
             SetBookDisplayScale(staticOpenScale);
         }
         else
-            Debug.LogWarning("BookAnimationController: bookOpenSprite not assigned!");
+            Debug.LogWarning("BookAnimationController: No static open sprite available.");
     }
+
+    private Sprite ResolveStaticOpenSprite()
+    {
+        if (bookOpenSprite != null)
+            return bookOpenSprite;
+
+        if (openFrames != null && openFrames.Length > 0)
+            return openFrames[openFrames.Length - 1];
+
+        return null;
+    }
+
+    private void TryPopulateAnimationFrames()
+    {
+        if (hasAttemptedRuntimeLoad)
+            return;
+
+        hasAttemptedRuntimeLoad = true;
+
+        // Migration safety: legacy serialized values can leave mode as InspectorOnly.
+        // If no usable frames are assigned, still attempt NewBook runtime loading.
+        if (frameSourceMode == FrameSourceMode.InspectorOnly && HasCoreFramesAssigned())
+            return;
+
+        openFrames = LoadFramesForSequence("Open", openFrames);
+        closeFrames = LoadFramesForSequence("Close", closeFrames);
+        flipForwardFrames = LoadFramesForSequence("FlipRight", flipForwardFrames);
+        flipBackwardFrames = LoadFramesForSequence("FlipLeft", flipBackwardFrames);
+        zoomInFrames = LoadFramesForSequence("ZoomIn", zoomInFrames);
+        zoomOutFrames = LoadFramesForSequence("ZoomOut", zoomOutFrames);
+    }
+
+    private bool HasCoreFramesAssigned()
+    {
+        return (openFrames != null && openFrames.Length > 0)
+            || (closeFrames != null && closeFrames.Length > 0)
+            || (flipForwardFrames != null && flipForwardFrames.Length > 0)
+            || (flipBackwardFrames != null && flipBackwardFrames.Length > 0);
+    }
+
+    [ContextMenu("Reload NewBook Frames")]
+    private void ReloadFramesFromNewBook()
+    {
+        hasAttemptedRuntimeLoad = false;
+        TryPopulateAnimationFrames();
+    }
+
+    private Sprite[] LoadFramesForSequence(string sequenceName, Sprite[] fallback)
+    {
+        Sprite[] loaded = null;
+
+#if UNITY_EDITOR
+        // In editor, always prefer the explicit NewBook folder PNG sequences.
+        if (allowEditorAssetDatabaseFallback)
+            loaded = LoadFramesFromAssetDatabase(sequenceName);
+#endif
+
+        if (loaded == null || loaded.Length == 0)
+            loaded = LoadFramesFromResources(sequenceName);
+
+        if (loaded != null && loaded.Length > 0)
+        {
+            Debug.Log($"BookAnimationController: Loaded {loaded.Length} frames for {sequenceName}.");
+            return loaded;
+        }
+
+        if (!string.IsNullOrWhiteSpace(editorAssetRoot))
+            Debug.LogWarning($"BookAnimationController: No PNG frames found for sequence '{sequenceName}' under '{editorAssetRoot}/{sequenceName}'. Using fallback inspector frames if assigned.");
+
+        return fallback;
+    }
+
+    private Sprite[] LoadFramesFromResources(string sequenceName)
+    {
+        if (string.IsNullOrWhiteSpace(resourcesRoot))
+            return null;
+
+        string path = $"{resourcesRoot}/{sequenceName}";
+        Sprite[] frames = Resources.LoadAll<Sprite>(path);
+        if (frames == null || frames.Length == 0)
+            return null;
+
+        return frames.OrderBy(sprite => sprite.name, StringComparer.Ordinal).ToArray();
+    }
+
+#if UNITY_EDITOR
+    private Sprite[] LoadFramesFromAssetDatabase(string sequenceName)
+    {
+        if (string.IsNullOrWhiteSpace(editorAssetRoot))
+            return null;
+
+        string folderPath = $"{editorAssetRoot}/{sequenceName}";
+        string[] guids = AssetDatabase.FindAssets("t:Sprite", new[] { folderPath });
+        if (guids == null || guids.Length == 0)
+            return null;
+
+        Sprite[] sprites = guids
+            .Select(guid => AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath(guid)))
+            .Where(sprite => sprite != null)
+            .OrderBy(sprite => sprite.name, StringComparer.Ordinal)
+            .ToArray();
+
+        return sprites.Length > 0 ? sprites : null;
+    }
+#endif
 
     private void SetBookDisplayScale(Vector3 targetScale)
     {

@@ -152,7 +152,7 @@ public class InventorySystem : MonoBehaviour
 
     void HandleInput()
     {
-        if (Input.GetKeyDown(KeyCode.I) || Input.GetKeyDown(KeyCode.Tab))
+        if (Input.GetKeyDown(KeyCode.I))
         {
             ToggleInventory();
         }
@@ -173,17 +173,12 @@ public class InventorySystem : MonoBehaviour
 
     public void OpenInventory()
     {
+        if (isInventoryOpen)
+            return;
+
         isInventoryOpen = true;
         inventoryCanvas.gameObject.SetActive(true);
-
-        // Pause player movement
-        var playerController = FindObjectOfType<OverheadController>();
-        if (playerController != null)
-            playerController.enabled = false;
-
-        // Show cursor
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        SetGameplayModeForInventory(false);
 
         RefreshInventoryDisplay();
 
@@ -192,20 +187,18 @@ public class InventorySystem : MonoBehaviour
 
     public void CloseInventory()
     {
-        if (inventoryCanvas == null)
+        if (!isInventoryOpen)
             return;
+
+        if (inventoryCanvas == null)
+        {
+            isInventoryOpen = false;
+            return;
+        }
 
         isInventoryOpen = false;
         inventoryCanvas.gameObject.SetActive(false);
-
-        // Resume player movement
-        var playerController = FindObjectOfType<OverheadController>();
-        if (playerController != null)
-            playerController.enabled = true;
-
-        // Hide cursor (if game uses cursor lock)
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        SetGameplayModeForInventory(true);
 
         DeselectItem();
 
@@ -215,6 +208,16 @@ public class InventorySystem : MonoBehaviour
     public bool IsInventoryOpen()
     {
         return isInventoryOpen;
+    }
+
+    private void SetGameplayModeForInventory(bool gameplayMode)
+    {
+        Cursor.lockState = gameplayMode ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !gameplayMode;
+
+        OverheadController playerController = Object.FindFirstObjectByType<OverheadController>();
+        if (playerController != null)
+            playerController.SetMovementEnabled(gameplayMode);
     }
 
     public void SetBuiltInInputEnabled(bool enabled)

@@ -307,10 +307,10 @@ public class MushroomResearchBook : MonoBehaviour
         currentPagePair = 0;
         UpdatePageDisplay();
 
-        // Lock player movement (optional)
+        // Lock player movement while reading
         var playerController = player?.GetComponent<OverheadController>();
         if (playerController != null)
-            playerController.enabled = false;
+            playerController.SetMovementEnabled(false);
 
         Debug.Log("📖 Research book opened!");
     }
@@ -343,10 +343,10 @@ public class MushroomResearchBook : MonoBehaviour
                 bookModel.SetActive(true);
         }
 
-        // Unlock player movement
+        // Restore player movement on close
         var playerController = player?.GetComponent<OverheadController>();
         if (playerController != null)
-            playerController.enabled = true;
+            playerController.SetMovementEnabled(true);
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;

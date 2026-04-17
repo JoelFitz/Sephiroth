@@ -33,6 +33,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     private InventorySystem inventorySystem;
     private MushroomResearchBook researchBook;
     private Book3DInteraction book3DInteraction;
+    private OverheadController playerController;
 
     private void Awake()
     {
@@ -62,6 +63,7 @@ public class UnifiedTabMenuController : MonoBehaviour
         ResolveDependencies();
         ApplyInputOwnership();
         CloseAllPanels();
+        SetGameplayMode(true);
     }
 
     private void Update()
@@ -72,7 +74,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     private void LateUpdate()
     {
         // Some scene objects can spawn after sceneLoaded callbacks; keep ownership synced.
-        if (mailSystem == null || inventorySystem == null || researchBook == null || book3DInteraction == null)
+        if (mailSystem == null || inventorySystem == null || researchBook == null || book3DInteraction == null || playerController == null)
         {
             ResolveDependencies();
             ApplyInputOwnership();
@@ -93,6 +95,7 @@ public class UnifiedTabMenuController : MonoBehaviour
         isMenuOpen = false;
         currentCategory = TabCategory.Quest;
         CloseAllPanels();
+        SetGameplayMode(true);
     }
 
     public void OpenCategory(TabCategory category)
@@ -115,6 +118,7 @@ public class UnifiedTabMenuController : MonoBehaviour
         if (!isMenuOpen)
         {
             CloseAllPanels();
+            SetGameplayMode(true);
         }
         else
         {
@@ -155,16 +159,14 @@ public class UnifiedTabMenuController : MonoBehaviour
     private void OpenMenu()
     {
         isMenuOpen = true;
-        ActivateCategory(currentCategory);
+        ActivateCategory(TabCategory.Quest);
     }
 
     private void CloseMenu()
     {
         isMenuOpen = false;
         CloseAllPanels();
-
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        SetGameplayMode(true);
     }
 
     private void ActivateCategory(TabCategory category)
@@ -189,13 +191,11 @@ public class UnifiedTabMenuController : MonoBehaviour
                 break;
             case TabCategory.Settings:
                 if (settingsPanel != null)
-                {
                     settingsPanel.SetActive(true);
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                }
                 break;
         }
+
+        SetGameplayMode(false);
     }
 
     private void CloseAllPanels()
@@ -227,12 +227,17 @@ public class UnifiedTabMenuController : MonoBehaviour
         if (book3DInteraction == null)
             book3DInteraction = Object.FindFirstObjectByType<Book3DInteraction>();
 
+        if (playerController == null)
+            playerController = Object.FindFirstObjectByType<OverheadController>();
+
         if (mailSystem == null)
             Debug.LogWarning("UnifiedTabMenuController: MailSystem not found in scene.");
         if (inventorySystem == null)
             Debug.LogWarning("UnifiedTabMenuController: InventorySystem not found in scene.");
         if (researchBook == null)
             Debug.LogWarning("UnifiedTabMenuController: MushroomResearchBook not found in scene.");
+        if (playerController == null)
+            Debug.LogWarning("UnifiedTabMenuController: OverheadController not found in scene.");
     }
 
     private void ApplyInputOwnership()
@@ -263,5 +268,19 @@ public class UnifiedTabMenuController : MonoBehaviour
         eventSystemObject.AddComponent<EventSystem>();
         eventSystemObject.AddComponent<StandaloneInputModule>();
         DontDestroyOnLoad(eventSystemObject);
+    }
+
+    private void SetGameplayMode(bool gameplayMode)
+    {
+        SetCursorForMenuOpen(!gameplayMode);
+
+        if (playerController != null)
+            playerController.SetMovementEnabled(gameplayMode);
+    }
+
+    private void SetCursorForMenuOpen(bool menuOpen)
+    {
+        Cursor.lockState = menuOpen ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.visible = menuOpen;
     }
 }

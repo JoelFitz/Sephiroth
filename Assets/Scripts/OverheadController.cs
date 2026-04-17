@@ -176,13 +176,6 @@ public class OverheadController : MonoBehaviour
         HandleSnapRotation();        // updates currentCameraAngle only
         UpdateCameraCollisionTarget(); // updates targetCameraDistance only
         HandleGravity();
-
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
-                ? CursorLockMode.None
-                : CursorLockMode.Locked;
-        }
     }
 
     // ── LateUpdate: ALL camera transform writes happen here, once per frame ──
