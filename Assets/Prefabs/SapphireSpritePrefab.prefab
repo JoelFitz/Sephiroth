@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 397896813924509665}
   - component: {fileID: 8053087623410205240}
   m_Layer: 0
-  m_Name: ShyShiitakePrefab
+  m_Name: SapphireSpritePrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

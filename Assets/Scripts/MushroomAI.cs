@@ -25,6 +25,15 @@ public class MushroomAI : MonoBehaviour
     [Header("Detection")]
     public LayerMask playerLayer = 1;
 
+    [Header("Ambient Idle Wander")]
+    public bool enableAmbientIdleWander = true;
+    public float ambientWalkSpeed = 1.2f;
+    public float ambientWanderRadius = 4f;
+    public float ambientWalkMinDuration = 1.2f;
+    public float ambientWalkMaxDuration = 2.6f;
+    public float ambientPauseMinDuration = 0.7f;
+    public float ambientPauseMaxDuration = 2.2f;
+
     // State Management
     public MushroomState currentState = MushroomState.Hidden;
     private MushroomState previousState;
@@ -40,6 +49,9 @@ public class MushroomAI : MonoBehaviour
     private bool playerInRange;
     private Vector3 originalPosition;
     private Vector3 fleeDirection;
+    private bool ambientIsWalking;
+    private float ambientPhaseEndTime;
+    private Vector3 ambientMoveDirection;
 
     private Vector3 modelOriginalLocalPosition;
 
@@ -138,6 +150,83 @@ public class MushroomAI : MonoBehaviour
             // Default behavior if no personality
             DefaultBehavior();
         }
+
+        UpdateAmbientIdleWander();
+    }
+
+    void UpdateAmbientIdleWander()
+    {
+        if (!ShouldAmbientIdleWander())
+        {
+            ResetAmbientIdleWander();
+            return;
+        }
+
+        if (Time.time >= ambientPhaseEndTime)
+        {
+            if (ambientIsWalking)
+            {
+                ambientIsWalking = false;
+                ambientPhaseEndTime = Time.time + Random.Range(ambientPauseMinDuration, ambientPauseMaxDuration);
+                StopMushroom();
+            }
+            else
+            {
+                Vector2 randomOffset = Random.insideUnitCircle * ambientWanderRadius;
+                Vector3 wanderTarget = originalPosition + new Vector3(randomOffset.x, 0f, randomOffset.y);
+                Vector3 toTarget = wanderTarget - transform.position;
+                toTarget.y = 0f;
+
+                if (toTarget.sqrMagnitude <= 0.04f)
+                {
+                    ambientIsWalking = false;
+                    ambientPhaseEndTime = Time.time + Random.Range(ambientPauseMinDuration, ambientPauseMaxDuration);
+                    StopMushroom();
+                    return;
+                }
+
+                ambientMoveDirection = toTarget.normalized;
+                ambientIsWalking = true;
+                ambientPhaseEndTime = Time.time + Random.Range(ambientWalkMinDuration, ambientWalkMaxDuration);
+            }
+        }
+
+        if (!ambientIsWalking)
+        {
+            StopMushroom();
+            return;
+        }
+
+        Vector3 fromOrigin = transform.position - originalPosition;
+        fromOrigin.y = 0f;
+        if (fromOrigin.magnitude > ambientWanderRadius * 1.15f)
+            ambientMoveDirection = (-fromOrigin).normalized;
+
+        MoveMushroom(ambientMoveDirection, ambientWalkSpeed);
+    }
+
+    bool ShouldAmbientIdleWander()
+    {
+        if (!enableAmbientIdleWander)
+            return false;
+
+        if (currentState != MushroomState.Idle)
+            return false;
+
+        if (playerInRange)
+            return false;
+
+        if (personality != null && !personality.AllowAmbientIdleWander)
+            return false;
+
+        return true;
+    }
+
+    void ResetAmbientIdleWander()
+    {
+        ambientIsWalking = false;
+        ambientPhaseEndTime = 0f;
+        ambientMoveDirection = Vector3.zero;
     }
 
     void DefaultBehavior()
@@ -169,6 +258,9 @@ public class MushroomAI : MonoBehaviour
         previousState = currentState;
         currentState = newState;
         stateTimer = 0f;
+
+        if (newState != MushroomState.Idle)
+            ResetAmbientIdleWander();
 
         Debug.Log($"Mushroom {name}: State changed from {previousState} to {currentState}");
 
