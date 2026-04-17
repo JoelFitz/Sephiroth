@@ -110,6 +110,7 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _Foam: 1
     - _FoamStrength: 2
     - _GlossMapScale: 0
     - _Glossiness: 0
@@ -121,6 +122,7 @@ Material:
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _RippleAmount: 2
+    - _Scale: 0.1
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
