@@ -199,7 +199,7 @@ public class MailSystem : MonoBehaviour
             questTitle = "Morning Foraging Order",
             requestedMushrooms = new List<MushroomRequest>
             {
-                new MushroomRequest { mushroomType = "Shiitake", quantity = 2, collectedQuantity = 0 }
+                new MushroomRequest { mushroomType = "Sapphire Sprite", quantity = 2, collectedQuantity = 0 }
             },
             deadline = DateTime.Now.AddMinutes(10),
             isCompleted = false
