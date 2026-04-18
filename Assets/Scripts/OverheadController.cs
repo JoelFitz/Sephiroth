@@ -400,6 +400,7 @@ public class OverheadController : MonoBehaviour
         {
             if (playerMotor != null)
             {
+                playerMotor.ApplyHorizontalVelocity(Vector3.zero);
                 playerMotor.SetSprinting(false);
                 playerMotor.SetFacingDirection(Vector3.zero);
             }
