@@ -96,10 +96,12 @@ public class FrogTongueController : MonoBehaviour
     private Vector3 wrapContactWorldPoint;
     private Quaternion preAttachLocalRotation;
     private bool restoringRotation;
+    private PlayerHealthStatus playerHealthStatus;
 
     void Start()
     {
         playerTransform = transform;
+        playerHealthStatus = GetComponent<PlayerHealthStatus>() ?? GetComponentInParent<PlayerHealthStatus>();
         SetupTongueAnchor();
         SetupVisualTongue();
         CreateTongue();
@@ -333,6 +335,9 @@ public class FrogTongueController : MonoBehaviour
     void HandleInput()
     {
         if (useUnifiedTongueInput)
+            return;
+
+        if (IsTongueBlockedByStun())
             return;
 
         if (Input.GetKeyDown(extendKey) && currentState == TongueState.Retracted)
@@ -1017,6 +1022,9 @@ public class FrogTongueController : MonoBehaviour
 
     public bool TryUnifiedTongueAction()
     {
+        if (IsTongueBlockedByStun())
+            return false;
+
         if (currentState == TongueState.Attached)
         {
             GrabAttachedTarget();
@@ -1030,6 +1038,11 @@ public class FrogTongueController : MonoBehaviour
         }
 
         return false;
+    }
+
+    bool IsTongueBlockedByStun()
+    {
+        return playerHealthStatus != null && playerHealthStatus.IsStunned;
     }
 
     void OnDestroy()

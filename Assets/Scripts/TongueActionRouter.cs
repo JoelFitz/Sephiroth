@@ -23,9 +23,12 @@ public class TongueActionRouter : MonoBehaviour
     private const float ElevatorCacheLifetime = 1f;
 
     private RopeElevator currentElevator;
+    private PlayerHealthStatus playerHealthStatus;
 
     void Awake()
     {
+        playerHealthStatus = GetComponent<PlayerHealthStatus>() ?? GetComponentInParent<PlayerHealthStatus>();
+
         if (swingGrappleSystem == null)
             swingGrappleSystem = GetComponent<SwingGrappleSystem>() ?? GetComponentInParent<SwingGrappleSystem>();
 
@@ -44,12 +47,18 @@ public class TongueActionRouter : MonoBehaviour
         if (elevatorCacheAge > ElevatorCacheLifetime || elevatorCache == null)
             RefreshElevatorCache();
 
+        if (IsTongueActionBlocked())
+            return;
+
         if (Input.GetKeyDown(tongueActionKey))
             HandleTongueAction();
     }
 
     void HandleTongueAction()
     {
+        if (IsTongueActionBlocked())
+            return;
+
         if (TrySwingAction())
             return;
 
@@ -140,5 +149,10 @@ public class TongueActionRouter : MonoBehaviour
     {
         elevatorCache = FindObjectsOfType<RopeElevator>();
         elevatorCacheAge = 0f;
+    }
+
+    bool IsTongueActionBlocked()
+    {
+        return playerHealthStatus != null && playerHealthStatus.IsStunned;
     }
 }
