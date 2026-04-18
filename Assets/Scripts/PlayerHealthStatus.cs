@@ -16,6 +16,7 @@ public class PlayerHealthStatus : MonoBehaviour
     public float fallbackToppleTorque = 18f;
     public float fallbackToppleLift = 1.25f;
     public float fallbackKnockdownAngle = 80f;
+    public float fallbackGroundOffset = 0.3f;
     public LayerMask terrainLayerMask = ~0;
 
     public bool IsStunned { get; private set; }
@@ -40,6 +41,8 @@ public class PlayerHealthStatus : MonoBehaviour
     private bool hasRagdoll;
     private bool ragdollActive;
     private Quaternion preStunRotation;
+    private Vector3 preStunPosition;
+    private bool appliedFallbackOffset;
     private StunMode activeStunMode = StunMode.None;
 
     private enum StunMode
@@ -126,6 +129,8 @@ public class PlayerHealthStatus : MonoBehaviour
     {
         IsStunned = true;
         preStunRotation = transform.rotation;
+        preStunPosition = transform.position;
+        appliedFallbackOffset = false;
         activeStunMode = StunMode.None;
 
         if (overheadController != null)
@@ -179,6 +184,17 @@ public class PlayerHealthStatus : MonoBehaviour
             // Non-physics knockdown pose so player appears toppled but cannot fall through map.
             Vector3 e = transform.eulerAngles;
             transform.rotation = Quaternion.Euler(fallbackKnockdownAngle, e.y, e.z);
+
+            if (fallbackGroundOffset > 0f)
+            {
+                Vector3 lowered = preStunPosition + Vector3.down * fallbackGroundOffset;
+                if (rb != null)
+                    rb.position = lowered;
+                else
+                    transform.position = lowered;
+
+                appliedFallbackOffset = true;
+            }
         }
 
         Debug.Log("Player stunned: movement disabled and faster regeneration started.");
@@ -215,6 +231,14 @@ public class PlayerHealthStatus : MonoBehaviour
             rb.angularVelocity = Vector3.zero;
         }
 
+        if (activeStunMode == StunMode.Pose && appliedFallbackOffset)
+        {
+            if (rb != null)
+                rb.position = preStunPosition;
+            else
+                transform.position = preStunPosition;
+        }
+
         if (animator != null)
             animator.enabled = animatorWasEnabled;
 
@@ -236,6 +260,7 @@ public class PlayerHealthStatus : MonoBehaviour
         ApplyDamageTint();
         Debug.Log("Player recovered from stun.");
         activeStunMode = StunMode.None;
+        appliedFallbackOffset = false;
     }
 
     void CacheRagdollParts()
