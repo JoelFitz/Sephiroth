@@ -4,7 +4,7 @@ public class MushroomPickup : MonoBehaviour
 {
     public MushroomData mushroomData;
     public float pickupRange = 2f;
-    public KeyCode pickupKey = KeyCode.F;
+    public KeyCode pickupKey = KeyCode.E;
     public GameObject pickupEffect;
 
     private Transform player;

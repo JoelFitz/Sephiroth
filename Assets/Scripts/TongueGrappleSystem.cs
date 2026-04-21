@@ -8,7 +8,7 @@ public class TongueGrappleSystem : MonoBehaviour
     public LayerMask grapplePointLayer = -1;
     public float grappleRange = 8f;
     public float grappleSpeed = 15f;
-    public KeyCode grappleKey = KeyCode.Space;
+    public KeyCode grappleKey = KeyCode.Mouse0;
     [Tooltip("If enabled, this system ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
     public bool useUnifiedTongueInput = true;
 

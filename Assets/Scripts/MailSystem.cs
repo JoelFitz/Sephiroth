@@ -28,7 +28,7 @@ public class MailSystem : MonoBehaviour
 
     [Header("UI Settings")]
     public GameObject mailUIPanel;
-    public KeyCode toggleMailKey = KeyCode.M;
+    public KeyCode toggleMailKey = KeyCode.L;
     private bool isMailOpen = false;
 
     public Button handInButton;

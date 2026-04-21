@@ -17,7 +17,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     [Header("Input")]
     [SerializeField] private KeyCode toggleMenuKey = KeyCode.Tab;
     [SerializeField] private KeyCode closeMenuKey = KeyCode.Escape;
-    [SerializeField] private KeyCode questCategoryKey = KeyCode.Alpha1;
+    [SerializeField] private KeyCode questCategoryKey = KeyCode.L;
     [SerializeField] private KeyCode researchCategoryKey = KeyCode.Alpha2;
     [SerializeField] private KeyCode inventoryCategoryKey = KeyCode.Alpha3;
     [SerializeField] private KeyCode settingsCategoryKey = KeyCode.Alpha4;
@@ -128,6 +128,15 @@ public class UnifiedTabMenuController : MonoBehaviour
 
     private void HandleInput()
     {
+        if (Input.GetKeyDown(closeMenuKey))
+        {
+            if (isMenuOpen)
+                CloseMenu();
+            else
+                OpenCategory(TabCategory.Settings);
+            return;
+        }
+
         if (Input.GetKeyDown(toggleMenuKey))
         {
             if (isMenuOpen)
@@ -139,12 +148,6 @@ public class UnifiedTabMenuController : MonoBehaviour
 
         if (!isMenuOpen)
             return;
-
-        if (Input.GetKeyDown(closeMenuKey))
-        {
-            CloseMenu();
-            return;
-        }
 
         if (Input.GetKeyDown(questCategoryKey))
             ActivateCategory(TabCategory.Quest);
@@ -159,7 +162,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     private void OpenMenu()
     {
         isMenuOpen = true;
-        ActivateCategory(TabCategory.Quest);
+        ActivateCategory(TabCategory.Inventory);
     }
 
     private void CloseMenu()

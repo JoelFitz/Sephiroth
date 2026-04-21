@@ -7,7 +7,7 @@ using UnityEngine;
 public class TongueActionRouter : MonoBehaviour
 {
     [Header("Input")]
-    public KeyCode tongueActionKey = KeyCode.Space;
+    public KeyCode tongueActionKey = KeyCode.Mouse0;
 
     [Header("Priority Systems")]
     public SwingGrappleSystem swingGrappleSystem;

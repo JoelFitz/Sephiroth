@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
@@ -21,6 +21,8 @@ public class FrogTongueController : MonoBehaviour
     public float springForce = 80f;
     public float springDamper = 10f;
     public float targetPullForce = 25f;
+    [Tooltip("Resistance force the mushroom applies against being pulled (0-1). Higher = more resistance.")]
+    public float mushroomReelResistance = 0.3f;
 
     [Header("Terrain Collision")]
     [Tooltip("Layers treated as terrain/ground for anti-clipping correction.")]
@@ -31,14 +33,14 @@ public class FrogTongueController : MonoBehaviour
     public float terrainClearance = 0.04f;
 
     [Header("Input")]
-    public KeyCode extendKey = KeyCode.Space;
-    public KeyCode grabKey = KeyCode.Space;
+    public KeyCode extendKey = KeyCode.Mouse0;
+    public KeyCode grabKey = KeyCode.Mouse0;
     [Tooltip("If enabled, this controller ignores direct key polling and expects a unified input router to call TryUnifiedTongueAction().")]
     public bool useUnifiedTongueInput = true;
 
     [Header("Attached Controls")]
     public int reelMouseButton = 0; // 0 = Left Mouse Button
-    public int releaseMouseButton = 1; // 1 = Right Mouse Button
+    public int releaseMouseButton = 0; // 0 = Left Mouse Button release
 
     [Header("Visual")]
     public Material tongueMaterial;
@@ -97,11 +99,16 @@ public class FrogTongueController : MonoBehaviour
     private Quaternion preAttachLocalRotation;
     private bool restoringRotation;
     private PlayerHealthStatus playerHealthStatus;
+    private Camera mainCamera;
+    private const int aimMouseButton = 1; // Right mouse button
+    private bool isAimingActive = false;
+    private KeyCode captureKey = KeyCode.E;
 
     void Start()
     {
         playerTransform = transform;
         playerHealthStatus = GetComponent<PlayerHealthStatus>() ?? GetComponentInParent<PlayerHealthStatus>();
+        mainCamera = Camera.main;
         SetupTongueAnchor();
         SetupVisualTongue();
         CreateTongue();
@@ -317,6 +324,7 @@ public class FrogTongueController : MonoBehaviour
 
     void Update()
     {
+        isAimingActive = Input.GetMouseButton(aimMouseButton);
         HandleInput();
         UpdateAnchorPosition();
         UpdateTongueState();
@@ -343,10 +351,7 @@ public class FrogTongueController : MonoBehaviour
         if (Input.GetKeyDown(extendKey) && currentState == TongueState.Retracted)
             ExtendTongue();
 
-        if (Input.GetKeyDown(grabKey) && currentState == TongueState.Attached)
-            GrabAttachedTarget();
-
-        if (currentState == TongueState.Attached && Input.GetMouseButtonDown(releaseMouseButton))
+        if (currentState == TongueState.Attached && Input.GetMouseButtonUp(reelMouseButton))
         {
             ReleaseMushroom();
             currentState = TongueState.Retracting;
@@ -356,7 +361,17 @@ public class FrogTongueController : MonoBehaviour
     void ExtendTongue()
     {
         currentState = TongueState.Extending;
-        tongueDirection = playerTransform.forward;
+        // If aiming with right mouse button, fire in camera direction; otherwise, fire forward
+        if (isAimingActive && mainCamera != null)
+        {
+            // Flatten camera forward to horizontal only - tongue fires straight ahead at ground level
+            Vector3 cameraForward = mainCamera.transform.forward;
+            tongueDirection = new Vector3(cameraForward.x, 0f, cameraForward.z).normalized;
+        }
+        else
+        {
+            tongueDirection = playerTransform.forward;
+        }
         currentTongueLength = 0f;
         activeSegments = 0;
 
@@ -391,8 +406,10 @@ public class FrogTongueController : MonoBehaviour
             if (i < tongueSegmentObjects.Count)
             {
                 tongueSegmentObjects[i].SetActive(true);
+                // Start tongue from a small offset in the direction it's firing to avoid self-collision
+                float offset = 0.5f; // Small offset away from anchor
                 Vector3 segmentPos = anchorObject.transform.position +
-                                     tongueDirection * (i + 1) * segmentLength;
+                                     tongueDirection * (offset + (i + 1) * segmentLength);
                 segmentPos = KeepPointAboveTerrain(segmentPos);
                 tongueSegmentObjects[i].transform.position = segmentPos;
             }
@@ -412,8 +429,9 @@ public class FrogTongueController : MonoBehaviour
     {
         if (activeSegments > 0)
         {
+            float offset = 0.5f; // Match the offset used in HandleTongueExtension
             Vector3 tongueEnd = anchorObject.transform.position +
-                                tongueDirection * currentTongueLength;
+                                tongueDirection * (offset + currentTongueLength);
 
             Collider[] nearbyObjects = Physics.OverlapSphere(tongueEnd, attachRange, catchableLayer);
             foreach (var obj in nearbyObjects)
@@ -468,7 +486,7 @@ public class FrogTongueController : MonoBehaviour
         InitializeWrapVisual(target);
         UpdateAttachmentJointToWrapContact();
 
-        Debug.Log($"Tongue attached to {target.name}! Press Space to grab it.");
+        Debug.Log($"Tongue attached to {target.name}! Hold left mouse to pull, release to retract.");
     }
 
     void HandleAttachedState()
@@ -506,8 +524,19 @@ public class FrogTongueController : MonoBehaviour
         if (isReelHeld && attachedTargetRigidbody != null)
         {
             Vector3 toAnchor = anchorObject.transform.position - attachedTargetRigidbody.position;
-            attachedTargetRigidbody.AddForce(toAnchor.normalized * targetPullForce, ForceMode.Acceleration);
+            // Flatten pull direction to horizontal-only to prevent mushroom from floating upward
+            Vector3 pullDirectionFlat = new Vector3(toAnchor.x, 0f, toAnchor.z).normalized;
+            // Apply resistance force opposing the pull
+            float resistanceForce = targetPullForce * mushroomReelResistance;
+            attachedTargetRigidbody.AddForce(pullDirectionFlat * (targetPullForce - resistanceForce), ForceMode.Acceleration);
             KeepRigidbodyAboveTerrain(attachedTargetRigidbody);
+        }
+
+        if (Input.GetMouseButtonUp(reelMouseButton))
+        {
+            ReleaseMushroom();
+            currentState = TongueState.Retracting;
+            return;
         }
 
         if (attachedTarget != null)
@@ -515,7 +544,26 @@ public class FrogTongueController : MonoBehaviour
             float distanceToPlayer = Vector3.Distance(
                 attachedTarget.transform.position, transform.position);
             if (distanceToPlayer < 2f)
-                Debug.Log("Mushroom is close! Press Space to grab it.");
+            {
+                Debug.Log("Mushroom is close! Press E to capture.");
+                
+                // Check for E key press to capture the mushroom
+                if (Input.GetKeyDown(captureKey))
+                {
+                    CaptureAttachedMushroom();
+                }
+            }
+        }
+    }
+
+    void CaptureAttachedMushroom()
+    {
+        if (attachedMushroomAI != null)
+        {
+            attachedMushroomAI.ChangeState(MushroomState.Collected);
+            ReleaseMushroom();
+            currentState = TongueState.Retracting;
+            Debug.Log($"Captured {attachedTarget.name}!");
         }
     }
 
@@ -1026,10 +1074,7 @@ public class FrogTongueController : MonoBehaviour
             return false;
 
         if (currentState == TongueState.Attached)
-        {
-            GrabAttachedTarget();
-            return true;
-        }
+            return false;
 
         if (CanStartUnifiedAction())
         {
@@ -1038,6 +1083,11 @@ public class FrogTongueController : MonoBehaviour
         }
 
         return false;
+    }
+
+    public bool IsAttached()
+    {
+        return currentState == TongueState.Attached;
     }
 
     bool IsTongueBlockedByStun()
@@ -1062,20 +1112,40 @@ public class FrogTongueController : MonoBehaviour
         if (characterVisual == null)
             return;
 
-        if (currentState == TongueState.Attached && attachedTarget != null)
+        // If aiming, always face camera direction (with or without attached target)
+        if (isAimingActive && mainCamera != null)
+        {
+            restoringRotation = false;
+            
+            Vector3 targetDirection = mainCamera.transform.forward;
+            // Flatten direction to horizontal-only to prevent frog from tilting up/down
+            Vector3 horizontalDir = new Vector3(targetDirection.x, 0f, targetDirection.z).normalized;
+            if (horizontalDir.sqrMagnitude < 0.0001f)
+                horizontalDir = characterVisual.forward;
+
+            Quaternion targetRot = Quaternion.LookRotation(horizontalDir, Vector3.up)
+                                 * Quaternion.Euler(visualRotationOffset);
+            characterVisual.rotation = Quaternion.Slerp(
+                characterVisual.rotation,
+                targetRot,
+                Time.deltaTime * characterRotateSpeed);
+        }
+        else if (currentState == TongueState.Attached && attachedTarget != null)
         {
             restoringRotation = false;
 
+            // Face the target when attached (not aiming)
             Vector3 lookPoint = hasWrapContactPoint ? wrapContactWorldPoint : attachedTarget.transform.position;
-            Vector3 dirToTarget = (lookPoint - characterVisual.position).normalized;
-            if (dirToTarget.sqrMagnitude < 0.0001f)
+            Vector3 targetDirection = (lookPoint - characterVisual.position).normalized;
+            if (targetDirection.sqrMagnitude < 0.0001f)
                 return;
 
-            Vector3 upRef = Mathf.Abs(dirToTarget.y) > 0.98f
-                ? characterVisual.right
-                : Vector3.up;
+            // Flatten direction to horizontal-only to prevent frog from tilting up/down
+            Vector3 horizontalDir = new Vector3(targetDirection.x, 0f, targetDirection.z).normalized;
+            if (horizontalDir.sqrMagnitude < 0.0001f)
+                horizontalDir = characterVisual.forward;
 
-            Quaternion targetRot = Quaternion.LookRotation(dirToTarget, upRef)
+            Quaternion targetRot = Quaternion.LookRotation(horizontalDir, Vector3.up)
                                  * Quaternion.Euler(visualRotationOffset);
             characterVisual.rotation = Quaternion.Slerp(
                 characterVisual.rotation,
@@ -1093,6 +1163,30 @@ public class FrogTongueController : MonoBehaviour
             {
                 characterVisual.localRotation = preAttachLocalRotation;
                 restoringRotation = false;
+            }
+        }
+        else
+        {
+            // Face the direction of movement when idle, not aiming, and not attached
+            Rigidbody playerRb = playerTransform.GetComponent<Rigidbody>();
+            if (playerRb != null)
+            {
+                Vector3 velocity = playerRb.linearVelocity;
+                // Only rotate if moving with meaningful speed
+                if (velocity.sqrMagnitude > 0.01f)
+                {
+                    // Flatten to horizontal only
+                    Vector3 movementDir = new Vector3(velocity.x, 0f, velocity.z).normalized;
+                    if (movementDir.sqrMagnitude > 0.0001f)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(movementDir, Vector3.up)
+                                             * Quaternion.Euler(visualRotationOffset);
+                        characterVisual.rotation = Quaternion.Slerp(
+                            characterVisual.rotation,
+                            targetRot,
+                            Time.deltaTime * characterRotateSpeed);
+                    }
+                }
             }
         }
     }
@@ -1136,3 +1230,4 @@ public class FrogTongueController : MonoBehaviour
         }
     }
 }
+

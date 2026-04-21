@@ -152,7 +152,7 @@ public class InventorySystem : MonoBehaviour
 
     void HandleInput()
     {
-        if (Input.GetKeyDown(KeyCode.I))
+        if (Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleInventory();
         }

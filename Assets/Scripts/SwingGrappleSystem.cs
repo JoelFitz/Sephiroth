@@ -28,7 +28,7 @@ public class SwingGrappleSystem : MonoBehaviour
 
     [Header("Input")]
     [Tooltip("Key to grab / release the rope.")]
-    public KeyCode grappleKey = KeyCode.F;
+    public KeyCode grappleKey = KeyCode.Mouse0;
 
     [Tooltip("If enabled, this system ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
     public bool useUnifiedTongueInput = true;

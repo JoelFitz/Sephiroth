@@ -56,7 +56,7 @@ public class MushroomResearchBook : MonoBehaviour
 
     [Header("Pickup Interaction")]
     public float pickupRange = 2f;
-    public KeyCode interactKey = KeyCode.E;
+    public KeyCode interactKey = KeyCode.B;
     public GameObject interactionPrompt; // Small world space "Press E" text
     private Book3DInteraction bookInteraction;
 
@@ -249,9 +249,9 @@ public class MushroomResearchBook : MonoBehaviour
         // Keep page navigation active while the book is open, even when unified menu owns open/close input.
         if (isBookOpen)
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+            if (Input.GetKeyDown(KeyCode.Q))
                 PreviousPageWithAnimation();
-            else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+            else if (Input.GetKeyDown(KeyCode.E))
                 NextPageWithAnimation();
         }
     }
