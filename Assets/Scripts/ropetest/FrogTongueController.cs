@@ -45,6 +45,11 @@ public class FrogTongueController : MonoBehaviour
     [Header("Visual")]
     public Material tongueMaterial;
 
+    [Header("Audio")]
+    public AudioClip tongueShootSound;
+    public AudioClip tongueAttachSound;
+    public AudioClip tongueReleaseSound;
+
     [Header("Wrap Visual")]
     public bool enableWrapVisual = true;
     [Range(8, 64)] public int wrapArcSegments = 20;
@@ -103,12 +108,24 @@ public class FrogTongueController : MonoBehaviour
     private const int aimMouseButton = 1; // Right mouse button
     private bool isAimingActive = false;
     private KeyCode captureKey = KeyCode.E;
+    private PlayerAudioController playerAudioController;
+    private AudioSource audioSource;
 
     void Start()
     {
         playerTransform = transform;
         playerHealthStatus = GetComponent<PlayerHealthStatus>() ?? GetComponentInParent<PlayerHealthStatus>();
         mainCamera = Camera.main;
+        playerAudioController = GetComponent<PlayerAudioController>() ?? GetComponentInParent<PlayerAudioController>();
+        if (playerAudioController == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+                audioSource = gameObject.AddComponent<AudioSource>();
+
+            audioSource.playOnAwake = false;
+            audioSource.volume = 0.8f;
+        }
         SetupTongueAnchor();
         SetupVisualTongue();
         CreateTongue();
@@ -361,6 +378,7 @@ public class FrogTongueController : MonoBehaviour
     void ExtendTongue()
     {
         currentState = TongueState.Extending;
+        PlayTongueSound(tongueShootSound);
         // If aiming with right mouse button, fire in camera direction; otherwise, fire forward
         if (isAimingActive && mainCamera != null)
         {
@@ -420,6 +438,7 @@ public class FrogTongueController : MonoBehaviour
 
         if (currentTongueLength >= maxTongueLength)
         {
+            PlayTongueSound(tongueReleaseSound);
             currentState = TongueState.Retracting;
             Debug.Log("Tongue missed - retracting");
         }
@@ -451,6 +470,7 @@ public class FrogTongueController : MonoBehaviour
         attachedTarget = target;
         attachedMushroomAI = target.GetComponent<MushroomAI>();
         currentState = TongueState.Attached;
+        PlayTongueSound(tongueAttachSound);
 
         if (characterVisual != null)
         {
@@ -583,6 +603,8 @@ public class FrogTongueController : MonoBehaviour
 
     void ReleaseMushroom()
     {
+        PlayTongueSound(tongueReleaseSound);
+
         if (attachedMushroomAI != null)
         {
             attachedMushroomAI.SetTongueGrabbed(false);
@@ -954,6 +976,27 @@ public class FrogTongueController : MonoBehaviour
             hasWrapContactPoint = false;
             attachmentJoint.autoConfigureConnectedAnchor = true;
         }
+    }
+
+    void PlayTongueSound(AudioClip clip)
+    {
+        if (clip == null)
+            return;
+
+        if (playerAudioController != null)
+        {
+            if (clip == tongueShootSound)
+                playerAudioController.PlayTongueShoot(clip);
+            else if (clip == tongueAttachSound)
+                playerAudioController.PlayTongueAttach(clip);
+            else
+                playerAudioController.PlayTongueRelease(clip);
+
+            return;
+        }
+
+        if (audioSource != null)
+            audioSource.PlayOneShot(clip);
     }
 
     void RenderWrapRing()

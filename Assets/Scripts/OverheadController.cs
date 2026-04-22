@@ -96,6 +96,15 @@ public class OverheadController : MonoBehaviour
     private bool movementEnabled = true;
     private int pendingSnapSteps = 0;
     private FrogTongueController frogTongueController;
+    private PlayerAudioController playerAudioController;
+    private bool wasGroundedLastFrame;
+    private bool hasInitializedGroundState;
+    private float footstepTimer;
+
+    void Awake()
+    {
+        EnsurePlayerAudioController();
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -126,6 +135,8 @@ public class OverheadController : MonoBehaviour
         EnsurePlayerHealthStatus();
 
         frogTongueController = GetComponent<FrogTongueController>() ?? GetComponentInParent<FrogTongueController>();
+        playerAudioController = GetComponent<PlayerAudioController>() ?? GetComponentInParent<PlayerAudioController>();
+        wasGroundedLastFrame = isGrounded;
 
         // Initial offset bake — camera not yet following, so direct call is fine here.
         CalculateCameraOffset();
@@ -179,6 +190,17 @@ public class OverheadController : MonoBehaviour
     void Update()
     {
         HandleGroundCheck();
+
+        if (!hasInitializedGroundState)
+        {
+            wasGroundedLastFrame = isGrounded;
+            hasInitializedGroundState = true;
+        }
+        else if (!wasGroundedLastFrame && isGrounded && playerAudioController != null)
+        {
+            playerAudioController.PlayLanding();
+        }
+
         HandleMovement();
         HandleJump();
         HandleCameraControls();
@@ -186,6 +208,8 @@ public class OverheadController : MonoBehaviour
         HandleSnapRotation();        // updates currentCameraAngle only
         UpdateCameraCollisionTarget(); // updates targetCameraDistance only
         HandleGravity();
+
+        wasGroundedLastFrame = isGrounded;
     }
 
     // ── LateUpdate: ALL camera transform writes happen here, once per frame ──
@@ -373,7 +397,11 @@ public class OverheadController : MonoBehaviour
 
     void HandleMovement()
     {
-        if (!movementEnabled) return;
+        if (!movementEnabled)
+        {
+            footstepTimer = 0f;
+            return;
+        }
 
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
@@ -386,6 +414,14 @@ public class OverheadController : MonoBehaviour
 
         if (inputDirection.magnitude >= 0.1f)
         {
+            footstepTimer += Time.deltaTime;
+            float stepInterval = sprintHeld ? 0.225f : 0.45f;
+            if (playerAudioController != null && footstepTimer >= stepInterval)
+            {
+                playerAudioController.PlayFootstep(sprintHeld);
+                footstepTimer -= stepInterval;
+            }
+
             Vector3 moveDirection;
 
             if (useSnapRotation)
@@ -427,6 +463,8 @@ public class OverheadController : MonoBehaviour
         }
         else
         {
+            footstepTimer = 0f;
+
             if (playerMotor != null)
             {
                 playerMotor.ApplyHorizontalVelocity(Vector3.zero);
@@ -603,6 +641,14 @@ public class OverheadController : MonoBehaviour
     }
 
     public bool IsMovementEnabled() => movementEnabled;
+
+    void EnsurePlayerAudioController()
+    {
+        if (GetComponent<PlayerAudioController>() == null)
+            playerAudioController = gameObject.AddComponent<PlayerAudioController>();
+        else
+            playerAudioController = GetComponent<PlayerAudioController>();
+    }
 
     void EnsureFrogAnimationDriver()
     {

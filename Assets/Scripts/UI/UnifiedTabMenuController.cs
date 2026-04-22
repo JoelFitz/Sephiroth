@@ -18,7 +18,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     [SerializeField] private KeyCode toggleMenuKey = KeyCode.Tab;
     [SerializeField] private KeyCode closeMenuKey = KeyCode.Escape;
     [SerializeField] private KeyCode questCategoryKey = KeyCode.L;
-    [SerializeField] private KeyCode researchCategoryKey = KeyCode.Alpha2;
+    [SerializeField] private KeyCode researchCategoryKey = KeyCode.B;
     [SerializeField] private KeyCode inventoryCategoryKey = KeyCode.Alpha3;
     [SerializeField] private KeyCode settingsCategoryKey = KeyCode.Alpha4;
 
@@ -128,6 +128,19 @@ public class UnifiedTabMenuController : MonoBehaviour
 
     private void HandleInput()
     {
+        // Dedicated category keys should work even when the unified menu is currently closed.
+        if (Input.GetKeyDown(questCategoryKey))
+        {
+            OpenCategory(TabCategory.Quest);
+            return;
+        }
+
+        if (Input.GetKeyDown(researchCategoryKey))
+        {
+            OpenCategory(TabCategory.Research);
+            return;
+        }
+
         if (Input.GetKeyDown(closeMenuKey))
         {
             if (isMenuOpen)
@@ -149,11 +162,7 @@ public class UnifiedTabMenuController : MonoBehaviour
         if (!isMenuOpen)
             return;
 
-        if (Input.GetKeyDown(questCategoryKey))
-            ActivateCategory(TabCategory.Quest);
-        else if (Input.GetKeyDown(researchCategoryKey))
-            ActivateCategory(TabCategory.Research);
-        else if (Input.GetKeyDown(inventoryCategoryKey))
+        if (Input.GetKeyDown(inventoryCategoryKey))
             ActivateCategory(TabCategory.Inventory);
         else if (Input.GetKeyDown(settingsCategoryKey))
             ActivateCategory(TabCategory.Settings);

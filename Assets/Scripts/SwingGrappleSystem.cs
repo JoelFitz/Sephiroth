@@ -113,6 +113,7 @@ public class SwingGrappleSystem : MonoBehaviour
     private Rigidbody rb;
     private PlayerMotor playerMotor;
     private OverheadController overheadController;
+    private PlayerAudioController playerAudioController;
 
     private enum SwingState { Idle, Shooting, Swinging }
     private SwingState state = SwingState.Idle;
@@ -156,6 +157,7 @@ public class SwingGrappleSystem : MonoBehaviour
 
         playerMotor     = GetComponent<PlayerMotor>()     ?? GetComponentInParent<PlayerMotor>();
         overheadController = GetComponent<OverheadController>() ?? GetComponentInParent<OverheadController>();
+        playerAudioController = GetComponent<PlayerAudioController>() ?? GetComponentInParent<PlayerAudioController>();
 
         SetupLineRenderer();
         SetupAudio();
@@ -351,8 +353,8 @@ public class SwingGrappleSystem : MonoBehaviour
         state          = SwingState.Swinging;
         groundedTimer  = 0f;
 
-        if (attachSound != null && audioSource != null)
-            audioSource.PlayOneShot(attachSound);
+        if (attachSound != null)
+            PlayRopeSound(attachSound, true);
     }
 
     // ── In-flight physics (FixedUpdate) ───────────────────────────────────────
@@ -466,8 +468,8 @@ public class SwingGrappleSystem : MonoBehaviour
         if (ropeRenderer != null)
             ropeRenderer.positionCount = 0;
 
-        if (releaseSound != null && audioSource != null)
-            audioSource.PlayOneShot(releaseSound);
+        if (releaseSound != null)
+            PlayRopeSound(releaseSound, false);
     }
 
     // ── Character visual rotation ──────────────────────────────────────────────
@@ -608,6 +610,25 @@ public class SwingGrappleSystem : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
         audioSource.volume = 0.75f;
+    }
+
+    void PlayRopeSound(AudioClip clip, bool isAttach)
+    {
+        if (clip == null)
+            return;
+
+        if (playerAudioController != null)
+        {
+            if (isAttach)
+                playerAudioController.PlayRopeAttach(clip);
+            else
+                playerAudioController.PlayRopeRelease(clip);
+
+            return;
+        }
+
+        if (audioSource != null)
+            audioSource.PlayOneShot(clip);
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
