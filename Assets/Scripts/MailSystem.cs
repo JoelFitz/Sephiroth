@@ -28,7 +28,7 @@ public class MailSystem : MonoBehaviour
 
     [Header("UI Settings")]
     public GameObject mailUIPanel;
-    public KeyCode toggleMailKey = KeyCode.M;
+    public KeyCode toggleMailKey = KeyCode.L;
     private bool isMailOpen = false;
 
     public Button handInButton;
@@ -120,54 +120,54 @@ public class MailSystem : MonoBehaviour
 
         if (Input.GetKeyDown(toggleMailKey))
         {
-            ToggleMailUI();
+            SetMailOpen(!isMailOpen);
         }
     }
 
-    void ToggleMailUI()
+    void SetMailOpen(bool open)
     {
-        isMailOpen = !isMailOpen;
+        if (isMailOpen == open)
+            return;
+
+        isMailOpen = open;
 
         if (mailUIPanel != null)
             mailUIPanel.SetActive(isMailOpen);
 
-        // FIX: Refresh UI content whenever the mail panel is opened
         if (isMailOpen)
         {
             var listUI = FindObjectOfType<MushroomListUI>();
             if (listUI != null)
                 listUI.Refresh();
-
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        } else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
         }
 
-            Debug.Log(isMailOpen ? "📬 Mail opened!" : "📬 Mail closed!");
+        SetGameplayModeForMail(!isMailOpen);
+        Debug.Log(isMailOpen ? "📬 Mail opened!" : "📬 Mail closed!");
     }
 
     public void OpenMailUI()
     {
-        if (isMailOpen)
-            return;
-
-        ToggleMailUI();
+        SetMailOpen(true);
     }
 
     public void CloseMailUI()
     {
-        if (!isMailOpen)
-            return;
-
-        ToggleMailUI();
+        SetMailOpen(false);
     }
 
     public bool IsMailOpen()
     {
         return isMailOpen;
+    }
+
+    private void SetGameplayModeForMail(bool gameplayMode)
+    {
+        Cursor.lockState = gameplayMode ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !gameplayMode;
+
+        OverheadController playerController = UnityEngine.Object.FindFirstObjectByType<OverheadController>();
+        if (playerController != null)
+            playerController.SetMovementEnabled(gameplayMode);
     }
 
     public void SetBuiltInInputEnabled(bool enabled)
@@ -199,7 +199,7 @@ public class MailSystem : MonoBehaviour
             questTitle = "Morning Foraging Order",
             requestedMushrooms = new List<MushroomRequest>
             {
-                new MushroomRequest { mushroomType = "Shiitake", quantity = 2, collectedQuantity = 0 }
+                new MushroomRequest { mushroomType = "Sapphire Sprite", quantity = 2, collectedQuantity = 0 }
             },
             deadline = DateTime.Now.AddMinutes(10),
             isCompleted = false

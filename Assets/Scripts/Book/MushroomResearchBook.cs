@@ -56,7 +56,7 @@ public class MushroomResearchBook : MonoBehaviour
 
     [Header("Pickup Interaction")]
     public float pickupRange = 2f;
-    public KeyCode interactKey = KeyCode.E;
+    public KeyCode interactKey = KeyCode.B;
     public GameObject interactionPrompt; // Small world space "Press E" text
     private Book3DInteraction bookInteraction;
 
@@ -249,9 +249,9 @@ public class MushroomResearchBook : MonoBehaviour
         // Keep page navigation active while the book is open, even when unified menu owns open/close input.
         if (isBookOpen)
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+            if (Input.GetKeyDown(KeyCode.Q))
                 PreviousPageWithAnimation();
-            else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+            else if (Input.GetKeyDown(KeyCode.E))
                 NextPageWithAnimation();
         }
     }
@@ -307,10 +307,10 @@ public class MushroomResearchBook : MonoBehaviour
         currentPagePair = 0;
         UpdatePageDisplay();
 
-        // Lock player movement (optional)
+        // Lock player movement while reading
         var playerController = player?.GetComponent<OverheadController>();
         if (playerController != null)
-            playerController.enabled = false;
+            playerController.SetMovementEnabled(false);
 
         Debug.Log("📖 Research book opened!");
     }
@@ -343,10 +343,10 @@ public class MushroomResearchBook : MonoBehaviour
                 bookModel.SetActive(true);
         }
 
-        // Unlock player movement
+        // Restore player movement on close
         var playerController = player?.GetComponent<OverheadController>();
         if (playerController != null)
-            playerController.enabled = true;
+            playerController.SetMovementEnabled(true);
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;

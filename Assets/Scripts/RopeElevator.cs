@@ -24,7 +24,7 @@ public class RopeElevator : MonoBehaviour
     public float rideSpeed = 4f;
 
     [Tooltip("Key the player must press while standing in the trigger to start riding.")]
-    public KeyCode useKey = KeyCode.F;
+    public KeyCode useKey = KeyCode.Mouse0;
 
     [Tooltip("If enabled, this elevator ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
     public bool useUnifiedTongueInput = true;

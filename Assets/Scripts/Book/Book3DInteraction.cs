@@ -6,7 +6,7 @@ public class Book3DInteraction : MonoBehaviour
 {
     [Header("3D Interaction")]
     public float interactionRange = 2.5f;
-    public KeyCode interactKey = KeyCode.E;
+    public KeyCode interactKey = KeyCode.B;
     public LayerMask playerLayer = 1;
 
     [Header("Visual Feedback")]
@@ -74,7 +74,7 @@ public class Book3DInteraction : MonoBehaviour
             promptObj.transform.localPosition = Vector3.up * promptHeight;
 
             worldSpacePrompt = promptObj.AddComponent<TextMeshPro>();
-            worldSpacePrompt.text = "Press E to read";
+            worldSpacePrompt.text = $"Press {interactKey} to read";
             worldSpacePrompt.fontSize = 2f;
             worldSpacePrompt.color = promptColor;
             worldSpacePrompt.alignment = TextAlignmentOptions.Center;

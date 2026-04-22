@@ -43,6 +43,9 @@ public class OverheadController : MonoBehaviour
     [SerializeField] private float upViewCameraAngle = 25f;
     [SerializeField] private float upViewTransitionSpeed = 3f;
     [SerializeField] private float upViewOrthographicSize = 12f;
+    [SerializeField] private bool enableRightMouseAimView = true;
+    [SerializeField] private int aimMouseButton = 1;
+    [SerializeField] private bool allowAimViewWhileTongueAttached = false;
 
     private float defaultCameraHeight;
     private float defaultCameraDistance;
@@ -92,6 +95,16 @@ public class OverheadController : MonoBehaviour
 
     private bool movementEnabled = true;
     private int pendingSnapSteps = 0;
+    private FrogTongueController frogTongueController;
+    private PlayerAudioController playerAudioController;
+    private bool wasGroundedLastFrame;
+    private bool hasInitializedGroundState;
+    private float footstepTimer;
+
+    void Awake()
+    {
+        EnsurePlayerAudioController();
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -121,8 +134,16 @@ public class OverheadController : MonoBehaviour
         EnsureFrogAnimationDriver();
         EnsurePlayerHealthStatus();
 
+        frogTongueController = GetComponent<FrogTongueController>() ?? GetComponentInParent<FrogTongueController>();
+        playerAudioController = GetComponent<PlayerAudioController>() ?? GetComponentInParent<PlayerAudioController>();
+        wasGroundedLastFrame = isGrounded;
+
         // Initial offset bake — camera not yet following, so direct call is fine here.
         CalculateCameraOffset();
+
+        // Ensure cursor is locked at startup (in case UI systems haven't initialized yet)
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     void SetupCamera()
@@ -169,6 +190,17 @@ public class OverheadController : MonoBehaviour
     void Update()
     {
         HandleGroundCheck();
+
+        if (!hasInitializedGroundState)
+        {
+            wasGroundedLastFrame = isGrounded;
+            hasInitializedGroundState = true;
+        }
+        else if (!wasGroundedLastFrame && isGrounded && playerAudioController != null)
+        {
+            playerAudioController.PlayLanding();
+        }
+
         HandleMovement();
         HandleJump();
         HandleCameraControls();
@@ -177,12 +209,7 @@ public class OverheadController : MonoBehaviour
         UpdateCameraCollisionTarget(); // updates targetCameraDistance only
         HandleGravity();
 
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
-                ? CursorLockMode.None
-                : CursorLockMode.Locked;
-        }
+        wasGroundedLastFrame = isGrounded;
     }
 
     // ── LateUpdate: ALL camera transform writes happen here, once per frame ──
@@ -222,7 +249,7 @@ public class OverheadController : MonoBehaviour
     {
         if (!enableUpArrowAdjustment) return;
 
-        bool upPressed = Input.GetKey(KeyCode.G);
+        bool upPressed = Input.GetKey(KeyCode.G) || IsAimViewHeld();
 
         if (upPressed && !isUpViewActive)
             isUpViewActive = true;
@@ -247,6 +274,23 @@ public class OverheadController : MonoBehaviour
         // Keep the collision target in sync with the (possibly lerping) cameraDistance.
         // The actual currentCameraDistance is smoothed in LateUpdate.
         targetCameraDistance = cameraDistance;
+    }
+
+    bool IsAimViewHeld()
+    {
+        if (!enableRightMouseAimView)
+            return false;
+
+        if (!Input.GetMouseButton(aimMouseButton))
+            return false;
+
+        if (allowAimViewWhileTongueAttached)
+            return true;
+
+        if (frogTongueController == null)
+            return true;
+
+        return !frogTongueController.IsAttached();
     }
 
     // Updates currentCameraAngle only.
@@ -322,9 +366,11 @@ public class OverheadController : MonoBehaviour
 
         Vector3 rayDirection = (desiredCameraPosition - playerPosition).normalized;
         float maxDistance = Vector3.Distance(playerPosition, desiredCameraPosition);
+        int collisionMask = wallLayerMask.value;
+        collisionMask &= ~LayerMask.GetMask("Player", "Rope", "Catchable");
 
         RaycastHit hit;
-        if (Physics.SphereCast(playerPosition, cameraCollisionRadius, rayDirection, out hit, maxDistance, wallLayerMask))
+        if (Physics.SphereCast(playerPosition, cameraCollisionRadius, rayDirection, out hit, maxDistance, collisionMask))
         {
             float safeDistance = hit.distance - cameraCollisionRadius;
             Vector3 hitPoint = playerPosition + rayDirection * safeDistance;
@@ -351,7 +397,11 @@ public class OverheadController : MonoBehaviour
 
     void HandleMovement()
     {
-        if (!movementEnabled) return;
+        if (!movementEnabled)
+        {
+            footstepTimer = 0f;
+            return;
+        }
 
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
@@ -364,6 +414,14 @@ public class OverheadController : MonoBehaviour
 
         if (inputDirection.magnitude >= 0.1f)
         {
+            footstepTimer += Time.deltaTime;
+            float stepInterval = sprintHeld ? 0.225f : 0.45f;
+            if (playerAudioController != null && footstepTimer >= stepInterval)
+            {
+                playerAudioController.PlayFootstep(sprintHeld);
+                footstepTimer -= stepInterval;
+            }
+
             Vector3 moveDirection;
 
             if (useSnapRotation)
@@ -405,8 +463,11 @@ public class OverheadController : MonoBehaviour
         }
         else
         {
+            footstepTimer = 0f;
+
             if (playerMotor != null)
             {
+                playerMotor.ApplyHorizontalVelocity(Vector3.zero);
                 playerMotor.SetSprinting(false);
                 playerMotor.SetFacingDirection(Vector3.zero);
             }
@@ -580,6 +641,14 @@ public class OverheadController : MonoBehaviour
     }
 
     public bool IsMovementEnabled() => movementEnabled;
+
+    void EnsurePlayerAudioController()
+    {
+        if (GetComponent<PlayerAudioController>() == null)
+            playerAudioController = gameObject.AddComponent<PlayerAudioController>();
+        else
+            playerAudioController = GetComponent<PlayerAudioController>();
+    }
 
     void EnsureFrogAnimationDriver()
     {

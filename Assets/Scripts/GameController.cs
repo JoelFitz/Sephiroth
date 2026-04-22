@@ -120,12 +120,6 @@ public class GameController : MonoBehaviour
         {
             TestCollectMushroom();
         }
-
-        // Escape to unlock cursor
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            ToggleCursor();
-        }
     }
 
     void ToggleQuestUI()
@@ -134,18 +128,6 @@ public class GameController : MonoBehaviour
         {
             isQuestUIVisible = !isQuestUIVisible;
             questUI.SetActive(isQuestUIVisible);
-        }
-    }
-
-    void ToggleCursor()
-    {
-        if (Cursor.lockState == CursorLockMode.Locked)
-        {
-            Cursor.lockState = CursorLockMode.None;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
         }
     }
 

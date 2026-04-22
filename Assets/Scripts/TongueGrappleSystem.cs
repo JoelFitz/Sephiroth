@@ -8,7 +8,7 @@ public class TongueGrappleSystem : MonoBehaviour
     public LayerMask grapplePointLayer = -1;
     public float grappleRange = 8f;
     public float grappleSpeed = 15f;
-    public KeyCode grappleKey = KeyCode.Space;
+    public KeyCode grappleKey = KeyCode.Mouse0;
     [Tooltip("If enabled, this system ignores its own key polling and expects a unified input router to call TryUnifiedTongueAction().")]
     public bool useUnifiedTongueInput = true;
 
@@ -45,6 +45,7 @@ public class TongueGrappleSystem : MonoBehaviour
     private Rigidbody playerRigidbody;
     private LineRenderer tongueRenderer;
     private AudioSource audioSource;
+    private PlayerAudioController playerAudioController;
 
     // Grapple State
     private enum GrappleState { Ready, Shooting, Attached, Swinging, Retracting }
@@ -82,6 +83,7 @@ public class TongueGrappleSystem : MonoBehaviour
 
         playerMotor = GetComponent<PlayerMotor>();
         playerRigidbody = GetComponent<Rigidbody>();
+        playerAudioController = GetComponent<PlayerAudioController>() ?? GetComponentInParent<PlayerAudioController>();
 
         if (characterController == null && playerMotor == null && playerRigidbody == null)
         {
@@ -575,7 +577,16 @@ public class TongueGrappleSystem : MonoBehaviour
 
     void PlaySound(AudioClip clip)
     {
-        if (clip != null && audioSource != null)
+        if (clip == null)
+            return;
+
+        if (playerAudioController != null)
+        {
+            playerAudioController.PlayTongueShoot(clip);
+            return;
+        }
+
+        if (audioSource != null)
             audioSource.PlayOneShot(clip);
     }
 
