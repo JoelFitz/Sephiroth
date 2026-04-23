@@ -1174,8 +1174,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useLocalDirection: 1
-  pushDirection: {x: 0, y: -0.5, z: 1}
-  pushStrength: 15
+  pushDirection: {x: 0, y: 0, z: 1}
+  pushStrength: 110
   normalizeDirection: 1
 --- !u!65 &95730931
 BoxCollider:
@@ -1584,8 +1584,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useLocalDirection: 1
-  pushDirection: {x: 0, y: -0.5, z: -1}
-  pushStrength: 15
+  pushDirection: {x: 0, y: 0, z: -1}
+  pushStrength: 110
   normalizeDirection: 1
 --- !u!65 &156465587
 BoxCollider:
@@ -3244,6 +3244,7 @@ MonoBehaviour:
   fallbackToppleTorque: 18
   fallbackToppleLift: 1.25
   fallbackKnockdownAngle: 80
+  fallbackGroundOffset: 0.3
   terrainLayerMask:
     serializedVersion: 2
     m_Bits: 8
@@ -3443,6 +3444,9 @@ MonoBehaviour:
   upViewCameraAngle: -5.7
   upViewTransitionSpeed: 2.35
   upViewOrthographicSize: 12
+  enableRightMouseAimView: 1
+  aimMouseButton: 1
+  allowAimViewWhileTongueAttached: 0
   enableCameraCollision: 1
   wallLayerMask:
     serializedVersion: 2
@@ -3485,6 +3489,7 @@ MonoBehaviour:
   springForce: 50
   springDamper: 8.54
   targetPullForce: 25
+  mushroomReelResistance: 0.3
   terrainCollisionMask:
     serializedVersion: 2
     m_Bits: 8
@@ -3496,6 +3501,9 @@ MonoBehaviour:
   reelMouseButton: 0
   releaseMouseButton: 1
   tongueMaterial: {fileID: 2100000, guid: e27a956a73f8ab343b57961e4879e7d2, type: 2}
+  tongueShootSound: {fileID: 0}
+  tongueAttachSound: {fileID: 0}
+  tongueReleaseSound: {fileID: 0}
   enableWrapVisual: 1
   wrapArcSegments: 14
   wrapRadiusMultiplier: 0.6
@@ -14936,8 +14944,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useLocalDirection: 1
-  pushDirection: {x: 0, y: -0.5, z: -1}
-  pushStrength: 15
+  pushDirection: {x: 0, y: 0, z: -1}
+  pushStrength: 110
   normalizeDirection: 1
 --- !u!65 &1604341131
 BoxCollider:
@@ -15425,8 +15433,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useLocalDirection: 1
-  pushDirection: {x: 0, y: -0.5, z: 1}
-  pushStrength: 15
+  pushDirection: {x: 0, y: 0, z: 1}
+  pushStrength: 110
   normalizeDirection: 1
 --- !u!65 &1623539815
 BoxCollider:
