@@ -6,8 +6,8 @@ TerrainLayer:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: groundfinal
-  m_DiffuseTexture: {fileID: 2800000, guid: 503a8fff95839504aae7fff2961815d8, type: 3}
+  m_Name: DarkGround
+  m_DiffuseTexture: {fileID: 2800000, guid: e556786dc723de7409d994e6be988ccf, type: 3}
   m_NormalMapTexture: {fileID: 2800000, guid: 47ced7919283b584f943734c49c433d9, type: 3}
   m_MaskMapTexture: {fileID: 0}
   m_TileSize: {x: 6, y: 6}
