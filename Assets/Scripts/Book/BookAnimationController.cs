@@ -49,6 +49,17 @@ public class BookAnimationController : MonoBehaviour
     [Tooltip("BookOpen.png — shown when book is fully open")]
     public Sprite bookOpenSprite;
 
+    [Header("Depth Wrap Sync")]
+    [SerializeField] private BookPageTextWrapController wrapController;
+    [SerializeField] private bool driveDepthDuringFlips = true;
+    [SerializeField] private bool toggleWrapWithBookVisibility = true;
+    [Tooltip("Depth sprite used while fully open/static. If empty, first frame from Colour Left/Right is used.")]
+    [SerializeField] private Sprite staticDepthSprite;
+    [SerializeField] private Sprite[] flipForwardDepthFrames;
+    [SerializeField] private Sprite[] flipBackwardDepthFrames;
+    [SerializeField] private string flipForwardDepthSequenceName = "Colour Right";
+    [SerializeField] private string flipBackwardDepthSequenceName = "Colour Left";
+
     [Header("Animation Settings")]
     [Tooltip("Frames per second for all animations")]
     public float frameRate = 12f;
@@ -100,6 +111,7 @@ public class BookAnimationController : MonoBehaviour
             return;
 
         TryPopulateAnimationFrames();
+        ResolveWrapController();
 
         if (bookDisplay == null)
         {
@@ -123,6 +135,7 @@ public class BookAnimationController : MonoBehaviour
         }
 
         bookDisplay.gameObject.SetActive(false);
+        SetWrapVisibility(false);
         isInitialized = true;
     }
 
@@ -144,6 +157,7 @@ public class BookAnimationController : MonoBehaviour
         if (currentState != BookAnimationState.Closed) yield break;
 
         bookDisplay.gameObject.SetActive(true);
+        SetWrapVisibility(false);
         SetBookDisplayScale(animationScale);
 
         if (!hasOpenedBefore)
@@ -173,6 +187,7 @@ public class BookAnimationController : MonoBehaviour
 
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetWrapVisibility(false);
         SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.ZoomingOut;
         yield return StartCoroutine(PlayFrames(zoomOutFrames, "ZoomOut"));
@@ -180,10 +195,11 @@ public class BookAnimationController : MonoBehaviour
         yield return StartCoroutine(PlayFrames(closeFrames, "Close"));
 
         bookDisplay.gameObject.SetActive(false);
+        SetWrapVisibility(false);
         currentState = BookAnimationState.Closed;
     }
 
-    public IEnumerator FlipForwardSequence()
+    public IEnumerator FlipForwardSequence(Action onMidFlip = null, Action<int, int, Sprite> onFlipFrame = null)
     {
         EnsureInitialized();
 
@@ -192,15 +208,16 @@ public class BookAnimationController : MonoBehaviour
 
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetWrapVisibility(true);
         SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.FlippingForward;
-        yield return StartCoroutine(PlayFrames(flipForwardFrames, "FlipForward"));
+        yield return StartCoroutine(PlayFrames(flipForwardFrames, "FlipForward", flipForwardDepthFrames, onMidFlip, onFlipFrame));
 
         currentState = BookAnimationState.Open;
         ShowStaticOpen();
     }
 
-    public IEnumerator FlipBackwardSequence()
+    public IEnumerator FlipBackwardSequence(Action onMidFlip = null, Action<int, int, Sprite> onFlipFrame = null)
     {
         EnsureInitialized();
 
@@ -209,15 +226,16 @@ public class BookAnimationController : MonoBehaviour
 
         if (currentState != BookAnimationState.Open) yield break;
 
+        SetWrapVisibility(true);
         SetBookDisplayScale(animationScale);
         currentState = BookAnimationState.FlippingBackward;
-        yield return StartCoroutine(PlayFrames(flipBackwardFrames, "FlipBackward"));
+        yield return StartCoroutine(PlayFrames(flipBackwardFrames, "FlipBackward", flipBackwardDepthFrames, onMidFlip, onFlipFrame));
 
         currentState = BookAnimationState.Open;
         ShowStaticOpen();
     }
 
-    private IEnumerator PlayFrames(Sprite[] frames, string animName)
+    private IEnumerator PlayFrames(Sprite[] frames, string animName, Sprite[] depthFrames = null, Action onMidAnimation = null, Action<int, int, Sprite> onFrame = null)
     {
         if (frames == null || frames.Length == 0)
         {
@@ -227,12 +245,29 @@ public class BookAnimationController : MonoBehaviour
         }
 
         float frameDuration = 1f / frameRate;
+        int midFrameIndex = Mathf.Max(0, (frames.Length / 2) - 1);
+        bool midCallbackFired = false;
 
-        foreach (Sprite frame in frames)
+        for (int i = 0; i < frames.Length; i++)
         {
+            Sprite frame = frames[i];
             bookDisplay.sprite = frame;
+            Sprite activeDepthFrame = ApplyDepthFrame(depthFrames, i, frames.Length);
+
+            if (onFrame != null)
+                onFrame(i, frames.Length, activeDepthFrame);
+
+            if (!midCallbackFired && onMidAnimation != null && i >= midFrameIndex)
+            {
+                midCallbackFired = true;
+                onMidAnimation();
+            }
+
             yield return new WaitForSeconds(frameDuration);
         }
+
+        if (!midCallbackFired && onMidAnimation != null)
+            onMidAnimation();
     }
 
     private void ShowStaticOpen()
@@ -240,8 +275,10 @@ public class BookAnimationController : MonoBehaviour
         Sprite staticSprite = ResolveStaticOpenSprite();
         if (staticSprite != null)
         {
+            SetWrapVisibility(true);
             bookDisplay.sprite = staticSprite;
             SetBookDisplayScale(staticOpenScale);
+            ApplyStaticDepth();
         }
         else
             Debug.LogWarning("BookAnimationController: No static open sprite available.");
@@ -276,6 +313,12 @@ public class BookAnimationController : MonoBehaviour
         flipBackwardFrames = LoadFramesForSequence("FlipLeft", flipBackwardFrames);
         zoomInFrames = LoadFramesForSequence("ZoomIn", zoomInFrames);
         zoomOutFrames = LoadFramesForSequence("ZoomOut", zoomOutFrames);
+
+        if (driveDepthDuringFlips)
+        {
+            flipForwardDepthFrames = LoadFramesForSequence(flipForwardDepthSequenceName, flipForwardDepthFrames);
+            flipBackwardDepthFrames = LoadFramesForSequence(flipBackwardDepthSequenceName, flipBackwardDepthFrames);
+        }
     }
 
     private bool HasCoreFramesAssigned()
@@ -360,6 +403,83 @@ public class BookAnimationController : MonoBehaviour
         RectTransform rectTransform = bookDisplay.rectTransform;
         if (rectTransform != null)
             rectTransform.localScale = targetScale;
+    }
+
+    private void ResolveWrapController()
+    {
+        if (wrapController != null)
+            return;
+
+        wrapController = FindObjectOfType<BookPageTextWrapController>();
+    }
+
+    private void SetWrapVisibility(bool isVisible)
+    {
+        if (!toggleWrapWithBookVisibility)
+            return;
+
+        ResolveWrapController();
+        if (wrapController == null)
+            return;
+
+        wrapController.SetOverlayVisible(isVisible);
+    }
+
+    private Sprite ApplyDepthFrame(Sprite[] depthFrames, int frameIndex, int totalFrameCount)
+    {
+        if (!driveDepthDuringFlips)
+            return null;
+
+        ResolveWrapController();
+        if (wrapController == null)
+            return null;
+
+        if (depthFrames == null || depthFrames.Length == 0)
+            return null;
+
+        int mappedIndex = MapFrameIndex(frameIndex, totalFrameCount, depthFrames.Length);
+        Sprite depthFrame = depthFrames[mappedIndex];
+        wrapController.SetRuntimeDepthSprite(depthFrame);
+        return depthFrame;
+    }
+
+    private void ApplyStaticDepth()
+    {
+        if (!driveDepthDuringFlips)
+            return;
+
+        ResolveWrapController();
+        if (wrapController == null)
+            return;
+
+        Sprite resolvedStaticDepth = ResolveStaticDepthSprite();
+        if (resolvedStaticDepth != null)
+            wrapController.SetRuntimeDepthSprite(resolvedStaticDepth);
+        else
+            wrapController.ClearRuntimeDepthSprite();
+    }
+
+    private Sprite ResolveStaticDepthSprite()
+    {
+        if (staticDepthSprite != null)
+            return staticDepthSprite;
+
+        if (flipBackwardDepthFrames != null && flipBackwardDepthFrames.Length > 0)
+            return flipBackwardDepthFrames[0];
+
+        if (flipForwardDepthFrames != null && flipForwardDepthFrames.Length > 0)
+            return flipForwardDepthFrames[0];
+
+        return null;
+    }
+
+    private static int MapFrameIndex(int sourceIndex, int sourceCount, int targetCount)
+    {
+        if (targetCount <= 1 || sourceCount <= 1)
+            return 0;
+
+        float t = sourceIndex / (float)(sourceCount - 1);
+        return Mathf.Clamp(Mathf.RoundToInt(t * (targetCount - 1)), 0, targetCount - 1);
     }
 
     public BookAnimationState GetCurrentState() => currentState;

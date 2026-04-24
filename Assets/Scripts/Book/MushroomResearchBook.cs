@@ -63,8 +63,23 @@ public class MushroomResearchBook : MonoBehaviour
     [Header("2D Book Animation")]
     public BookAnimationController bookAnimationController;
 
+    [Header("Page Wrap Overlay")]
+    [SerializeField] private BookPageTextWrapController pageWrapController;
+
+    [Header("Flip Visual Timing")]
+    [SerializeField, Min(0f)] private float sideSwapStaggerSeconds = 0.06f;
+    [SerializeField] private bool useDepthColorDrivenSwap = true;
+    [SerializeField, Range(0.01f, 1f)] private float depthColorChangeThreshold = 0.18f;
+    [SerializeField, Min(0f)] private float backwardFirstSideDelaySeconds = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float backwardColorFirstSwapMinProgress = 0.62f;
+
     [Header("Research Data")]
     public MushroomResearchEntry[] mushroomEntries;
+
+    [Header("Debug Test Pages")]
+    [SerializeField] private bool useInspectorTestPages = false;
+    [SerializeField] private bool includeDefaultCoverInTestPages = true;
+    [SerializeField] private List<BookPagePair> inspectorTestPagePairs = new List<BookPagePair>();
 
     // Runtime state
     private List<MushroomResearchEntry> discoveredMushrooms = new List<MushroomResearchEntry>();
@@ -76,6 +91,8 @@ public class MushroomResearchBook : MonoBehaviour
     [SerializeField] private bool builtInInputEnabled = true;
     [SerializeField] private bool worldInteractionEnabled = true;
     private Coroutine closeBookAnimationRoutine;
+    private Coroutine stagedSideSwapRoutine;
+    private bool hasLoggedDepthReadabilityWarning;
 
     // Page content
     private List<BookPagePair> bookPages = new List<BookPagePair>();
@@ -89,6 +106,21 @@ public class MushroomResearchBook : MonoBehaviour
         public string rightTitle;
         public string rightContent;
         public Sprite rightImage;
+    }
+
+    private sealed class FlipColorSwapTracker
+    {
+        public int targetPagePairIndex;
+        public bool swapRightFirst;
+        public float firstSideMinProgress;
+        public bool baselineCaptured;
+        public Color baselineLeft;
+        public Color baselineRight;
+        public bool firstSideApplied;
+        public bool secondSideApplied;
+
+        public bool HasAnySwap => firstSideApplied || secondSideApplied;
+        public bool IsComplete => firstSideApplied && secondSideApplied;
     }
 
     public static MushroomResearchBook Instance { get; private set; }
@@ -158,6 +190,9 @@ public class MushroomResearchBook : MonoBehaviour
                 Debug.LogWarning("MushroomResearchBook: BookAnimationController not found after scene transition. UI may not animate properly.");
             }
         }
+
+        if (pageWrapController == null)
+            pageWrapController = GetComponent<BookPageTextWrapController>();
 
         // Reacquire player reference in case it was recreated
         if (player == null || !player.gameObject.activeSelf)
@@ -426,8 +461,43 @@ public class MushroomResearchBook : MonoBehaviour
     {
         bookPages.Clear();
 
+        if (useInspectorTestPages && inspectorTestPagePairs != null && inspectorTestPagePairs.Count > 0)
+        {
+            if (includeDefaultCoverInTestPages)
+                bookPages.Add(CreateDefaultCoverPage());
+
+            foreach (var testPair in inspectorTestPagePairs)
+            {
+                if (testPair == null)
+                    continue;
+
+                bookPages.Add(new BookPagePair
+                {
+                    leftTitle = testPair.leftTitle,
+                    leftContent = testPair.leftContent,
+                    leftImage = testPair.leftImage,
+                    rightTitle = testPair.rightTitle,
+                    rightContent = testPair.rightContent,
+                    rightImage = testPair.rightImage
+                });
+            }
+
+            return;
+        }
+
         // Cover page
-        bookPages.Add(new BookPagePair
+        bookPages.Add(CreateDefaultCoverPage());
+
+        // Mushroom pages (one page pair per mushroom)
+        foreach (var entry in discoveredMushrooms.OrderBy(e => e.displayName))
+        {
+            bookPages.Add(CreateMushroomPagePair(entry));
+        }
+    }
+
+    private BookPagePair CreateDefaultCoverPage()
+    {
+        return new BookPagePair
         {
             leftTitle = "Mushroom Research Journal",
             leftContent = "A Field Guide to Fungal Discoveries\n\nBy: Frog Naturalist\n\nDiscovered Species: " + discoveredMushrooms.Count,
@@ -435,13 +505,7 @@ public class MushroomResearchBook : MonoBehaviour
             rightTitle = "Table of Contents",
             rightContent = GenerateTableOfContents(),
             rightImage = null
-        });
-
-        // Mushroom pages (one page pair per mushroom)
-        foreach (var entry in discoveredMushrooms.OrderBy(e => e.displayName))
-        {
-            bookPages.Add(CreateMushroomPagePair(entry));
-        }
+        };
     }
 
     [ContextMenu("Add Test Mushrooms")]
@@ -578,20 +642,235 @@ public class MushroomResearchBook : MonoBehaviour
 
     private IEnumerator NextPageAnimationSequence()
     {
-        // Play flip forward animation
-        yield return StartCoroutine(bookAnimationController.FlipForwardSequence());
-        
-        // Update page content after animation
-        NextPage();
+        bool pageChanged = false;
+        int targetIndex = currentPagePair + 1;
+        FlipColorSwapTracker tracker = useDepthColorDrivenSwap ? CreateFlipColorSwapTracker(targetIndex, swapRightFirst: true, firstSideMinProgress: 0f) : null;
+
+        // Forward flip: reveal right page first, then left page.
+        yield return StartCoroutine(bookAnimationController.FlipForwardSequence(() =>
+        {
+            if (pageChanged || (tracker != null && tracker.HasAnySwap))
+                return;
+
+            pageChanged = true;
+            StageSwapToPage(targetIndex, swapRightFirst: true, firstSideDelaySeconds: 0f);
+        }, (frameIndex, frameCount, depthFrame) =>
+        {
+            if (pageChanged || tracker == null)
+                return;
+
+            if (TryAdvanceColorDrivenSwap(tracker, depthFrame, frameIndex, frameCount))
+                pageChanged = true;
+        }));
+
+        if (tracker != null && tracker.HasAnySwap && !tracker.IsComplete)
+        {
+            ApplyPagePairToDisplay(bookPages[targetIndex], updateLeft: true, updateRight: true);
+            SyncWrapSpritesFromDisplayedPages();
+            pageChanged = true;
+        }
+
+        if (!pageChanged)
+            NextPage();
+
+        if (stagedSideSwapRoutine != null)
+        {
+            yield return stagedSideSwapRoutine;
+            stagedSideSwapRoutine = null;
+        }
     }
 
     private IEnumerator PreviousPageAnimationSequence()
     {
-        // Play flip backward animation
-        yield return StartCoroutine(bookAnimationController.FlipBackwardSequence());
-        
-        // Update page content after animation
-        PreviousPage();
+        bool pageChanged = false;
+        int targetIndex = currentPagePair - 1;
+        FlipColorSwapTracker tracker = useDepthColorDrivenSwap ? CreateFlipColorSwapTracker(targetIndex, swapRightFirst: false, firstSideMinProgress: backwardColorFirstSwapMinProgress) : null;
+
+        // Backward flip: reveal left page first, then right page.
+        yield return StartCoroutine(bookAnimationController.FlipBackwardSequence(() =>
+        {
+            if (pageChanged || (tracker != null && tracker.HasAnySwap))
+                return;
+
+            pageChanged = true;
+            StageSwapToPage(targetIndex, swapRightFirst: false, firstSideDelaySeconds: backwardFirstSideDelaySeconds);
+        }, (frameIndex, frameCount, depthFrame) =>
+        {
+            if (pageChanged || tracker == null)
+                return;
+
+            if (TryAdvanceColorDrivenSwap(tracker, depthFrame, frameIndex, frameCount))
+                pageChanged = true;
+        }));
+
+        if (tracker != null && tracker.HasAnySwap && !tracker.IsComplete)
+        {
+            ApplyPagePairToDisplay(bookPages[targetIndex], updateLeft: true, updateRight: true);
+            SyncWrapSpritesFromDisplayedPages();
+            pageChanged = true;
+        }
+
+        if (!pageChanged)
+            PreviousPage();
+
+        if (stagedSideSwapRoutine != null)
+        {
+            yield return stagedSideSwapRoutine;
+            stagedSideSwapRoutine = null;
+        }
+    }
+
+    private FlipColorSwapTracker CreateFlipColorSwapTracker(int targetPagePairIndex, bool swapRightFirst, float firstSideMinProgress)
+    {
+        if (targetPagePairIndex < 0 || targetPagePairIndex >= bookPages.Count)
+            return null;
+
+        return new FlipColorSwapTracker
+        {
+            targetPagePairIndex = targetPagePairIndex,
+            swapRightFirst = swapRightFirst,
+            firstSideMinProgress = Mathf.Clamp01(firstSideMinProgress)
+        };
+    }
+
+    private bool TryAdvanceColorDrivenSwap(FlipColorSwapTracker tracker, Sprite depthFrame, int frameIndex, int frameCount)
+    {
+        if (tracker == null || depthFrame == null)
+            return false;
+
+        Color leftColor;
+        Color rightColor;
+        if (!TrySampleDepthSideColors(depthFrame, out leftColor, out rightColor))
+            return false;
+
+        if (!tracker.baselineCaptured)
+        {
+            tracker.baselineCaptured = true;
+            tracker.baselineLeft = leftColor;
+            tracker.baselineRight = rightColor;
+            return false;
+        }
+
+        float leftDelta = ColorDistance(leftColor, tracker.baselineLeft);
+        float rightDelta = ColorDistance(rightColor, tracker.baselineRight);
+        float progress = frameCount > 1 ? frameIndex / (float)(frameCount - 1) : 1f;
+
+        bool firstSideChanged = tracker.swapRightFirst ? rightDelta >= depthColorChangeThreshold : leftDelta >= depthColorChangeThreshold;
+        bool secondSideChanged = tracker.swapRightFirst ? leftDelta >= depthColorChangeThreshold : rightDelta >= depthColorChangeThreshold;
+
+        BookPagePair target = bookPages[tracker.targetPagePairIndex];
+
+        if (!tracker.firstSideApplied && progress >= tracker.firstSideMinProgress && firstSideChanged)
+        {
+            currentPagePair = tracker.targetPagePairIndex;
+            UpdateNavigationAndPageNumber();
+
+            if (tracker.swapRightFirst)
+                ApplyPagePairToDisplay(target, updateLeft: false, updateRight: true);
+            else
+                ApplyPagePairToDisplay(target, updateLeft: true, updateRight: false);
+
+            SyncWrapSpritesFromDisplayedPages();
+            tracker.firstSideApplied = true;
+        }
+
+        if (tracker.firstSideApplied && !tracker.secondSideApplied && secondSideChanged)
+        {
+            if (tracker.swapRightFirst)
+                ApplyPagePairToDisplay(target, updateLeft: true, updateRight: false);
+            else
+                ApplyPagePairToDisplay(target, updateLeft: false, updateRight: true);
+
+            SyncWrapSpritesFromDisplayedPages();
+            tracker.secondSideApplied = true;
+        }
+
+        return tracker.IsComplete;
+    }
+
+    private bool TrySampleDepthSideColors(Sprite depthSprite, out Color leftColor, out Color rightColor)
+    {
+        leftColor = Color.black;
+        rightColor = Color.black;
+
+        if (depthSprite == null || depthSprite.texture == null)
+            return false;
+
+        Texture2D texture = depthSprite.texture;
+        Rect rect = depthSprite.textureRect;
+
+        float leftU = (rect.x + rect.width * 0.25f) / texture.width;
+        float rightU = (rect.x + rect.width * 0.75f) / texture.width;
+        float v = (rect.y + rect.height * 0.5f) / texture.height;
+
+        try
+        {
+            leftColor = texture.GetPixelBilinear(leftU, v);
+            rightColor = texture.GetPixelBilinear(rightU, v);
+            return true;
+        }
+        catch (UnityException)
+        {
+            if (!hasLoggedDepthReadabilityWarning)
+            {
+                hasLoggedDepthReadabilityWarning = true;
+                Debug.LogWarning("MushroomResearchBook: Depth color-driven swap requires Read/Write enabled on Colour Left/Colour Right textures. Falling back to timing-based swap.");
+            }
+
+            return false;
+        }
+    }
+
+    private static float ColorDistance(Color a, Color b)
+    {
+        float dr = a.r - b.r;
+        float dg = a.g - b.g;
+        float db = a.b - b.b;
+        return Mathf.Sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    private void StageSwapToPage(int targetPagePairIndex, bool swapRightFirst, float firstSideDelaySeconds)
+    {
+        if (targetPagePairIndex < 0 || targetPagePairIndex >= bookPages.Count)
+            return;
+
+        if (stagedSideSwapRoutine != null)
+            StopCoroutine(stagedSideSwapRoutine);
+
+        stagedSideSwapRoutine = StartCoroutine(ApplyStagedSideSwap(targetPagePairIndex, swapRightFirst, firstSideDelaySeconds));
+    }
+
+    private IEnumerator ApplyStagedSideSwap(int targetPagePairIndex, bool swapRightFirst, float firstSideDelaySeconds)
+    {
+        BookPagePair target = bookPages[targetPagePairIndex];
+        currentPagePair = targetPagePairIndex;
+        UpdateNavigationAndPageNumber();
+
+        if (firstSideDelaySeconds > 0f)
+            yield return new WaitForSeconds(firstSideDelaySeconds);
+
+        if (swapRightFirst)
+        {
+            ApplyPagePairToDisplay(target, updateLeft: false, updateRight: true);
+            SyncWrapSpritesFromDisplayedPages();
+
+            if (sideSwapStaggerSeconds > 0f)
+                yield return new WaitForSeconds(sideSwapStaggerSeconds);
+
+            ApplyPagePairToDisplay(target, updateLeft: true, updateRight: false);
+            SyncWrapSpritesFromDisplayedPages();
+        }
+        else
+        {
+            ApplyPagePairToDisplay(target, updateLeft: true, updateRight: false);
+            SyncWrapSpritesFromDisplayedPages();
+
+            if (sideSwapStaggerSeconds > 0f)
+                yield return new WaitForSeconds(sideSwapStaggerSeconds);
+
+            ApplyPagePairToDisplay(target, updateLeft: false, updateRight: true);
+            SyncWrapSpritesFromDisplayedPages();
+        }
     }
 
     void UpdatePageDisplay()
@@ -600,33 +879,58 @@ public class MushroomResearchBook : MonoBehaviour
 
         var pagePair = bookPages[currentPagePair];
 
-        // Left page
-        if (leftPageTitle != null)
-            leftPageTitle.text = pagePair.leftTitle;
-        if (leftPageContent != null)
-            leftPageContent.text = pagePair.leftContent;
-        if (leftPageImage != null)
+        ApplyPagePairToDisplay(pagePair, updateLeft: true, updateRight: true);
+        SyncWrapSpritesFromDisplayedPages();
+        UpdateNavigationAndPageNumber();
+    }
+
+    private void ApplyPagePairToDisplay(BookPagePair pagePair, bool updateLeft, bool updateRight)
+    {
+        if (pagePair == null)
+            return;
+
+        if (updateLeft)
         {
-            leftPageImage.sprite = pagePair.leftImage;
-            leftPageImage.gameObject.SetActive(pagePair.leftImage != null);
+            if (leftPageTitle != null)
+                leftPageTitle.text = pagePair.leftTitle;
+            if (leftPageContent != null)
+                leftPageContent.text = pagePair.leftContent;
+            if (leftPageImage != null)
+            {
+                leftPageImage.sprite = pagePair.leftImage;
+                leftPageImage.gameObject.SetActive(pagePair.leftImage != null);
+            }
         }
 
-        // Right page
-        if (rightPageTitle != null)
-            rightPageTitle.text = pagePair.rightTitle;
-        if (rightPageContent != null)
-            rightPageContent.text = pagePair.rightContent;
-        if (rightPageImage != null)
+        if (updateRight)
         {
-            rightPageImage.sprite = pagePair.rightImage;
-            rightPageImage.gameObject.SetActive(pagePair.rightImage != null);
+            if (rightPageTitle != null)
+                rightPageTitle.text = pagePair.rightTitle;
+            if (rightPageContent != null)
+                rightPageContent.text = pagePair.rightContent;
+            if (rightPageImage != null)
+            {
+                rightPageImage.sprite = pagePair.rightImage;
+                rightPageImage.gameObject.SetActive(pagePair.rightImage != null);
+            }
         }
+    }
 
-        // Page number
+    private void SyncWrapSpritesFromDisplayedPages()
+    {
+        if (pageWrapController == null)
+            return;
+
+        Sprite leftSprite = leftPageImage != null ? leftPageImage.sprite : null;
+        Sprite rightSprite = rightPageImage != null ? rightPageImage.sprite : null;
+        pageWrapController.SetPageSprites(leftSprite, rightSprite);
+    }
+
+    private void UpdateNavigationAndPageNumber()
+    {
         if (pageNumberText != null)
             pageNumberText.text = $"Page {(currentPagePair * 2) + 1}-{(currentPagePair * 2) + 2}";
 
-        // Update navigation buttons
         if (nextPageButton != null)
             nextPageButton.interactable = currentPagePair < bookPages.Count - 1;
         if (previousPageButton != null)
