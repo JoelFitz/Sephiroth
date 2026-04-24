@@ -19,6 +19,13 @@ public class SapphireSpritePersonality : MushroomPersonality
 
     [Header("Ground Detection")]
     public float groundOffset = 0.1f;
+    [Tooltip("Guarantees a minimum vertical clearance above terrain to prevent visible sinking.")]
+    public float minimumGroundClearance = 0.22f;
+    [Tooltip("Optional extra clearance scaled from collider size.")]
+    public bool scaleClearanceByCollider = true;
+    [Tooltip("Fraction of collider half-height used as additional minimum clearance.")]
+    [Range(0f, 1f)]
+    public float colliderClearanceFactor = 0.25f;
     public float raycastDistance = 50f;
     public LayerMask terrainLayerMask = -1;
 
@@ -26,6 +33,7 @@ public class SapphireSpritePersonality : MushroomPersonality
     private float lastFleeDirectionUpdate = 0f;
     private float lastGroundUpdate = 0f;
     private Rigidbody rb;
+    private Collider rootCollider;
     private bool wasKinematic;
 
     // Burrowing state
@@ -41,6 +49,7 @@ public class SapphireSpritePersonality : MushroomPersonality
     {
         base.Initialize(ai, mushroomData);
         rb = GetComponent<Rigidbody>();
+        rootCollider = GetComponent<Collider>();
 
         if (rb != null)
             wasKinematic = rb.isKinematic;
@@ -149,10 +158,11 @@ public class SapphireSpritePersonality : MushroomPersonality
     {
         Vector3 worldPos = transform.position;
         float groundHeight = GetGroundHeight(worldPos);
+        float effectiveGroundOffset = GetEffectiveGroundOffset();
 
         if (groundHeight != worldPos.y)
         {
-            Vector3 newPosition = new Vector3(worldPos.x, groundHeight + groundOffset, worldPos.z);
+            Vector3 newPosition = new Vector3(worldPos.x, groundHeight + effectiveGroundOffset, worldPos.z);
 
             if (rb != null && !rb.isKinematic)
                 rb.MovePosition(newPosition);
@@ -194,7 +204,7 @@ public class SapphireSpritePersonality : MushroomPersonality
 
         Vector3 currentPos = transform.position;
         float groundHeight = GetGroundHeight(currentPos);
-        float targetY = groundHeight + groundOffset;
+        float targetY = groundHeight + GetEffectiveGroundOffset();
 
         if (Mathf.Abs(currentPos.y - targetY) > 0.05f)
         {
@@ -208,6 +218,19 @@ public class SapphireSpritePersonality : MushroomPersonality
             surfacePosition = targetPosition;
             burrowedPosition = surfacePosition - Vector3.up * data.hideDepth;
         }
+    }
+
+    float GetEffectiveGroundOffset()
+    {
+        float effectiveOffset = groundOffset;
+
+        if (scaleClearanceByCollider && rootCollider != null)
+        {
+            float colliderBasedClearance = rootCollider.bounds.extents.y * colliderClearanceFactor;
+            effectiveOffset = Mathf.Max(effectiveOffset, colliderBasedClearance);
+        }
+
+        return Mathf.Max(effectiveOffset, minimumGroundClearance);
     }
 
     void HandleHiddenState()

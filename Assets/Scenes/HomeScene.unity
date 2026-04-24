@@ -2386,6 +2386,79 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1515374523}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &435467086
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: BookPageTextWrap (Runtime)
+  m_Shader: {fileID: 4800000, guid: b99f46edfc1e8c042add580bffb96d93, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BookDepthTex:
+        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
+        m_Scale: {x: 0.6840385, y: 0.74731857}
+        m_Offset: {x: 0.1631231, y: 0.10423274}
+    - _LeftDepthTex:
+        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LeftTextTex:
+        m_Texture: {fileID: 2800000, guid: b6c9eb817400888419b00719c86ff09c, type: 3}
+        m_Scale: {x: 0.86990076, y: 0.93491507}
+        m_Offset: {x: 0.051730104, y: 0.035047576}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RightDepthTex:
+        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RightTextTex:
+        m_Texture: {fileID: 2800000, guid: b6c9eb817400888419b00719c86ff09c, type: 3}
+        m_Scale: {x: 0.86990076, y: 0.93491507}
+        m_Offset: {x: 0.051730104, y: 0.035047576}
+    m_Ints: []
+    m_Floats:
+    - _ColorMask: 15
+    - _DepthBias: 0.203
+    - _DepthColorSoftness: 0.527
+    - _DepthColorThreshold: 0
+    - _DepthShadow: 1
+    - _LeftWarpStrength: 0.25
+    - _PageSeparation: -0.491
+    - _PageSplit: 0.5
+    - _RightWarpStrength: 0.25
+    - _Stencil: 0
+    - _StencilComp: 8
+    - _StencilOp: 0
+    - _StencilReadMask: 255
+    - _StencilWriteMask: 255
+    - _TextBlend: 1
+    - _TextScale: 0.634
+    - _TextScaleX: 0.765
+    - _TextTintStrength: 0
+    - _UseUIAlphaClip: 0
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _TextTint: {r: 0.21698111, g: 0.111970425, b: 0.041963324, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &439606062
 GameObject:
   m_ObjectHideFlags: 0
@@ -2853,79 +2926,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!21 &544733182
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: BookPageTextWrap (Runtime)
-  m_Shader: {fileID: 4800000, guid: b99f46edfc1e8c042add580bffb96d93, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BookDepthTex:
-        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
-        m_Scale: {x: 0.6840385, y: 0.74731857}
-        m_Offset: {x: 0.1631231, y: 0.10423274}
-    - _LeftDepthTex:
-        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _LeftTextTex:
-        m_Texture: {fileID: 2800000, guid: b6c9eb817400888419b00719c86ff09c, type: 3}
-        m_Scale: {x: 0.86990076, y: 0.93491507}
-        m_Offset: {x: 0.051730104, y: 0.035047576}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _RightDepthTex:
-        m_Texture: {fileID: 2800000, guid: 3c311c4ef798d48458b6fc151641bf3f, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _RightTextTex:
-        m_Texture: {fileID: 2800000, guid: b6c9eb817400888419b00719c86ff09c, type: 3}
-        m_Scale: {x: 0.86990076, y: 0.93491507}
-        m_Offset: {x: 0.051730104, y: 0.035047576}
-    m_Ints: []
-    m_Floats:
-    - _ColorMask: 15
-    - _DepthBias: 0.203
-    - _DepthColorSoftness: 0.527
-    - _DepthColorThreshold: 0
-    - _DepthShadow: 1
-    - _LeftWarpStrength: 0.25
-    - _PageSeparation: -0.491
-    - _PageSplit: 0.5
-    - _RightWarpStrength: 0.25
-    - _Stencil: 0
-    - _StencilComp: 8
-    - _StencilOp: 0
-    - _StencilReadMask: 255
-    - _StencilWriteMask: 255
-    - _TextBlend: 1
-    - _TextScale: 0.634
-    - _TextScaleX: 0.765
-    - _TextTintStrength: 0
-    - _UseUIAlphaClip: 0
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _TextTint: {r: 0.21698111, g: 0.111970425, b: 0.041963324, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &547533015
 GameObject:
   m_ObjectHideFlags: 0
@@ -3717,6 +3717,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   overheadController: {fileID: 862228365}
+  playerMotor: {fileID: 0}
   animator: {fileID: 1666203688}
   characterController: {fileID: 0}
   idleStateName: metarig_TPose
@@ -3957,8 +3958,8 @@ MonoBehaviour:
   reelMouseButton: 0
   releaseMouseButton: 1
   tongueMaterial: {fileID: 2100000, guid: e27a956a73f8ab343b57961e4879e7d2, type: 2}
-  tongueShootSound: {fileID: 0}
-  tongueAttachSound: {fileID: 0}
+  tongueShootSound: {fileID: 8300000, guid: 7c3b7b1928f6665488a9d7a88f7fce26, type: 3}
+  tongueAttachSound: {fileID: 8300000, guid: 67c722849d36cd144bb865de82743ca2, type: 3}
   tongueReleaseSound: {fileID: 0}
   enableWrapVisual: 1
   wrapArcSegments: 14
@@ -12777,6 +12778,7 @@ MonoBehaviour:
   questsPerDay: 2
   minMushroomsPerQuest: 1
   maxMushroomsPerQuest: 4
+  useStoryQuestChain: 1
   availableMushroomTypes:
   - Sapphire Sprite
   - Iconic Spellcap
@@ -13399,7 +13401,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 544733182}
+  m_Material: {fileID: 435467086}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}

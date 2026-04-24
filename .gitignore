@@ -7,6 +7,7 @@
 /[Tt]emp/
 /[Oo]bj/
 /[Bb]uild/
+/[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
@@ -72,3 +73,21 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+builds/beta 3.zip
+builds/beta 2.zip
+builds/beta/Sephiroth_Data/globalgamemanagers
+builds/beta/Sephiroth_Data/globalgamemanagers.assets
+builds/beta/Sephiroth_Data/level0
+builds/beta/Sephiroth_Data/level1
+builds/beta/Sephiroth_Data/level2
+builds/beta/Sephiroth_Data/level3
+builds/beta/Sephiroth_Data/Managed/Assembly-CSharp.dll
+builds/beta/Sephiroth_Data/resources.assets
+builds/beta/Sephiroth_Data/sharedassets0.assets
+builds/beta/Sephiroth_Data/sharedassets1.assets
+builds/beta/Sephiroth_Data/sharedassets1.assets.resS
+builds/beta/Sephiroth_Data/sharedassets2.assets
+builds/beta/Sephiroth_Data/sharedassets3.assets
+builds/beta/Sephiroth_Data/sharedassets3.assets.resS
+builds/beta/Sephiroth_Data/boot.config
+/builds

@@ -17,6 +17,13 @@ public class FrogTongueController : MonoBehaviour
     public float attachRange = 0.8f;
     public LayerMask catchableLayer = 1;
 
+    [Header("Target Assist")]
+    [Tooltip("If enabled, tiny colliders receive a small effective hit-range boost so they are still catchable.")]
+    public bool enableSmallTargetAssist = true;
+    [Tooltip("Approximate minimum effective radius used for very small targets.")]
+    [Range(0f, 1f)]
+    public float minimumTargetRadius = 0.3f;
+
     [Header("Physics Settings")]
     public float springForce = 80f;
     public float springDamper = 10f;
@@ -90,6 +97,8 @@ public class FrogTongueController : MonoBehaviour
     private Vector3 tongueDirection;
     private float currentTongueLength;
     private int activeSegments;
+    private Vector3 previousTongueTip;
+    private bool hasPreviousTongueTip;
 
     // Visual-only ring wrap state around attached targets.
     private bool wrapVisualActive;
@@ -392,6 +401,8 @@ public class FrogTongueController : MonoBehaviour
         }
         currentTongueLength = 0f;
         activeSegments = 0;
+        previousTongueTip = GetCurrentTongueTip();
+        hasPreviousTongueTip = true;
 
         Debug.Log("Frog tongue extending...");
     }
@@ -448,21 +459,103 @@ public class FrogTongueController : MonoBehaviour
     {
         if (activeSegments > 0)
         {
-            float offset = 0.5f; // Match the offset used in HandleTongueExtension
-            Vector3 tongueEnd = anchorObject.transform.position +
-                                tongueDirection * (offset + currentTongueLength);
+            Vector3 tongueEnd = GetCurrentTongueTip();
+            float queryRange = attachRange + (enableSmallTargetAssist ? minimumTargetRadius : 0f);
 
-            Collider[] nearbyObjects = Physics.OverlapSphere(tongueEnd, attachRange, catchableLayer);
-            foreach (var obj in nearbyObjects)
+            Collider[] nearbyObjects = Physics.OverlapSphere(
+                tongueEnd,
+                queryRange,
+                catchableLayer,
+                QueryTriggerInteraction.Collide
+            );
+
+            if (TryAttachClosestCandidate(nearbyObjects, tongueEnd))
             {
-                MushroomAI mushroom = obj.GetComponent<MushroomAI>();
-                if (mushroom != null && !mushroom.IsTongueGrabbed())
+                return;
+            }
+
+            if (hasPreviousTongueTip)
+            {
+                Vector3 sweep = tongueEnd - previousTongueTip;
+                float sweepDistance = sweep.magnitude;
+                if (sweepDistance > 0.001f)
                 {
-                    AttachToTarget(mushroom.gameObject);
-                    return;
+                    RaycastHit[] sweepHits = Physics.SphereCastAll(
+                        previousTongueTip,
+                        attachRange,
+                        sweep.normalized,
+                        sweepDistance,
+                        catchableLayer,
+                        QueryTriggerInteraction.Collide
+                    );
+
+                    foreach (var hit in sweepHits)
+                    {
+                        if (hit.collider == null)
+                            continue;
+
+                        MushroomAI mushroom = hit.collider.GetComponentInParent<MushroomAI>();
+                        if (mushroom != null && !mushroom.IsTongueGrabbed())
+                        {
+                            AttachToTarget(mushroom.gameObject);
+                            return;
+                        }
+                    }
                 }
             }
+
+            previousTongueTip = tongueEnd;
+            hasPreviousTongueTip = true;
         }
+    }
+
+    Vector3 GetCurrentTongueTip()
+    {
+        float offset = 0.5f;
+        return anchorObject.transform.position + tongueDirection * (offset + currentTongueLength);
+    }
+
+    bool TryAttachClosestCandidate(Collider[] candidates, Vector3 tongueEnd)
+    {
+        MushroomAI bestMushroom = null;
+        float bestSqrDistance = float.MaxValue;
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate == null)
+                continue;
+
+            MushroomAI mushroom = candidate.GetComponentInParent<MushroomAI>();
+            if (mushroom == null || mushroom.IsTongueGrabbed())
+                continue;
+
+            float effectiveAttachRange = attachRange;
+            if (enableSmallTargetAssist)
+            {
+                float targetRadius = candidate.bounds.extents.magnitude;
+                float assistBonus = Mathf.Max(0f, minimumTargetRadius - targetRadius);
+                effectiveAttachRange += assistBonus;
+            }
+
+            Vector3 closestPoint = candidate.ClosestPoint(tongueEnd);
+            float sqrDistance = (closestPoint - tongueEnd).sqrMagnitude;
+            if (sqrDistance > effectiveAttachRange * effectiveAttachRange)
+                continue;
+
+            if (sqrDistance < bestSqrDistance)
+            {
+                bestSqrDistance = sqrDistance;
+                bestMushroom = mushroom;
+            }
+        }
+
+        if (bestMushroom != null)
+        {
+            AttachToTarget(bestMushroom.gameObject);
+            return true;
+        }
+
+        return false;
     }
 
     void AttachToTarget(GameObject target)
@@ -622,6 +715,7 @@ public class FrogTongueController : MonoBehaviour
 
         attachedTarget = null;
         ClearWrapVisual();
+        hasPreviousTongueTip = false;
 
         if (characterVisual != null)
             restoringRotation = true;
@@ -629,6 +723,8 @@ public class FrogTongueController : MonoBehaviour
 
     void HandleTongueRetraction()
     {
+        hasPreviousTongueTip = false;
+
         if (attachedTarget != null)
             ReleaseMushroom();
 

@@ -62,6 +62,15 @@ public class MailSystem : MonoBehaviour
     public int minMushroomsPerQuest = 1;
     public int maxMushroomsPerQuest = 4;
 
+    [Header("Story Quest Settings")]
+    [SerializeField] private bool useStoryQuestChain = true;
+
+    private readonly List<MushroomQuest> storyQuestLine = new List<MushroomQuest>();
+    private int currentStoryQuestIndex = -1;
+    private bool storyQuestChainInitialized;
+    private bool storyQuestChainCompleted;
+    private bool waitingForSleepAfterFirstQuestHandIn;
+
     [SerializeField]
     private string[] availableMushroomTypes = {
         "Chanterelle", "Shiitake", "Morel", "Oyster", "Porcini", "Enoki"
@@ -110,7 +119,7 @@ public class MailSystem : MonoBehaviour
             currentDay = GameSessionManager.Instance.CurrentDay;
         }
 
-        GenerateTestQuest();
+        InitializeQuestFlow();
     }
 
     void Update()
@@ -180,6 +189,11 @@ public class MailSystem : MonoBehaviour
         CloseMailUI();
         activeQuests.Clear();
         currentQuest = null;
+        storyQuestLine.Clear();
+        currentStoryQuestIndex = -1;
+        storyQuestChainInitialized = false;
+        storyQuestChainCompleted = false;
+        waitingForSleepAfterFirstQuestHandIn = false;
         totalUpgradePoints = 0;
         currentDay = 1;
         isMailOpen = false;
@@ -189,23 +203,143 @@ public class MailSystem : MonoBehaviour
             mailUIPanel.SetActive(false);
 
         Debug.Log("MailSystem: Reset for new game.");
+
+        InitializeQuestFlow();
     }
 
-    void GenerateTestQuest()
+    private void InitializeQuestFlow()
+    {
+        if (!useStoryQuestChain)
+        {
+            if (activeQuests.Count == 0 && currentQuest == null)
+                GenerateDailyQuests();
+
+            return;
+        }
+
+        if (storyQuestChainCompleted)
+            return;
+
+        if (storyQuestChainInitialized)
+        {
+            if (currentQuest != null)
+                return;
+
+            if (activeQuests.Count > 0)
+            {
+                currentQuest = activeQuests[0];
+                return;
+            }
+
+            if (currentStoryQuestIndex >= 0 && currentStoryQuestIndex < storyQuestLine.Count)
+            {
+                ActivateStoryQuest(storyQuestLine[currentStoryQuestIndex]);
+            }
+
+            return;
+        }
+
+        storyQuestLine.Clear();
+        storyQuestLine.Add(CreateStoryQuest(
+            "QUEST_001",
+            "Forest Scout: Sapphire Sprites",
+            new[] { ("Sapphire Sprite", 3) }));
+        storyQuestLine.Add(CreateStoryQuest(
+            "QUEST_002",
+            "Forest Basket: Rare Caps",
+            new[] { ("Iconic Spellcap", 2), ("TurkeyTail", 1) }));
+        storyQuestLine.Add(CreateStoryQuest(
+            "QUEST_003",
+            "Level 2: Teleporting Mushrooms",
+            new[] { ("Teleporting Mushroom", 2) }));
+
+        storyQuestChainInitialized = true;
+        currentStoryQuestIndex = 0;
+        ActivateStoryQuest(storyQuestLine[currentStoryQuestIndex]);
+    }
+
+    private MushroomQuest CreateStoryQuest(string questId, string questTitle, (string mushroomType, int quantity)[] requests)
     {
         var quest = new MushroomQuest
         {
-            questId = "QUEST_001",
-            questTitle = "Morning Foraging Order",
-            requestedMushrooms = new List<MushroomRequest>
-            {
-                new MushroomRequest { mushroomType = "Sapphire Sprite", quantity = 2, collectedQuantity = 0 }
-            },
+            questId = questId,
+            questTitle = questTitle,
+            requestedMushrooms = new List<MushroomRequest>(),
             deadline = DateTime.Now.AddMinutes(10),
             isCompleted = false
         };
 
-        ReceiveNewQuest(quest);
+        for (int i = 0; i < requests.Length; i++)
+        {
+            quest.requestedMushrooms.Add(new MushroomRequest
+            {
+                mushroomType = requests[i].mushroomType,
+                quantity = requests[i].quantity,
+                collectedQuantity = 0
+            });
+        }
+
+        return quest;
+    }
+
+    private void ActivateStoryQuest(MushroomQuest quest)
+    {
+        if (quest == null)
+            return;
+
+        activeQuests.Clear();
+        currentQuest = quest;
+        activeQuests.Add(quest);
+        OnNewQuestReceived?.Invoke(quest);
+
+        if (isMailOpen)
+            FindObjectOfType<MushroomListUI>()?.Refresh();
+
+        Debug.Log($"New story quest received: {quest.questTitle}");
+    }
+
+    private void AdvanceStoryQuest()
+    {
+        if (!useStoryQuestChain)
+            return;
+
+        currentStoryQuestIndex++;
+
+        if (currentStoryQuestIndex >= storyQuestLine.Count)
+        {
+            storyQuestChainCompleted = true;
+            currentQuest = null;
+            activeQuests.Clear();
+            RefreshUI();
+            Debug.Log("Story quest chain completed.");
+            return;
+        }
+
+        ActivateStoryQuest(storyQuestLine[currentStoryQuestIndex]);
+    }
+
+    private void ActivateSleepObjectiveAfterFirstQuest()
+    {
+        waitingForSleepAfterFirstQuestHandIn = true;
+
+        var sleepQuest = new MushroomQuest
+        {
+            questId = "QUEST_SLEEP_001",
+            questTitle = "Go home and sleep",
+            requestedMushrooms = new List<MushroomRequest>(),
+            deadline = DateTime.Now.AddMinutes(30),
+            isCompleted = false
+        };
+
+        activeQuests.Clear();
+        currentQuest = sleepQuest;
+        activeQuests.Add(sleepQuest);
+        OnNewQuestReceived?.Invoke(sleepQuest);
+
+        if (isMailOpen)
+            FindObjectOfType<MushroomListUI>()?.Refresh();
+
+        Debug.Log("Story quest update: Go home and sleep. Next quest unlocks after sleeping.");
     }
 
     public void ReceiveNewQuest(MushroomQuest quest)
@@ -282,9 +416,23 @@ public class MailSystem : MonoBehaviour
         activeQuests.Remove(currentQuest);
         currentQuest = null;
 
-        // Set the next active quest if one exists
-        if (activeQuests.Count > 0)
+        // Move to the next story quest if the campaign chain is enabled.
+        if (useStoryQuestChain)
+        {
+            // After the first hand-in, gate progression behind sleeping.
+            if (currentStoryQuestIndex == 0)
+            {
+                ActivateSleepObjectiveAfterFirstQuest();
+            }
+            else
+            {
+                AdvanceStoryQuest();
+            }
+        }
+        else if (activeQuests.Count > 0)
+        {
             currentQuest = activeQuests[0];
+        }
 
         // Refresh UI
         if (isMailOpen)
@@ -305,6 +453,19 @@ public class MailSystem : MonoBehaviour
         }
 
         Debug.Log($"🌅 Day {currentDay} begins!");
+
+        if (useStoryQuestChain)
+        {
+            if (waitingForSleepAfterFirstQuestHandIn)
+            {
+                waitingForSleepAfterFirstQuestHandIn = false;
+                AdvanceStoryQuest();
+            }
+
+            RefreshUI();
+            Debug.Log("MailSystem: Story quest chain is active; preserving quests across the new day.");
+            return;
+        }
 
         ClearOldQuests();
         GenerateDailyQuests();
