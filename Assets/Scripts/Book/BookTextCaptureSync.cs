@@ -1,19 +1,15 @@
-using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class BookTextCaptureSync : MonoBehaviour
 {
     [Header("Sources")]
-    [SerializeField] private TMP_Text sourceLeftTitle;
-    [SerializeField] private TMP_Text sourceLeftContent;
-    [SerializeField] private TMP_Text sourceRightTitle;
-    [SerializeField] private TMP_Text sourceRightContent;
+    [SerializeField] private Image sourceLeftPage;
+    [SerializeField] private Image sourceRightPage;
 
     [Header("Capture Targets")]
-    [SerializeField] private TMP_Text captureLeftTitle;
-    [SerializeField] private TMP_Text captureLeftContent;
-    [SerializeField] private TMP_Text captureRightTitle;
-    [SerializeField] private TMP_Text captureRightContent;
+    [SerializeField] private Image captureLeftPage;
+    [SerializeField] private Image captureRightPage;
 
     [Header("Sync")]
     [SerializeField] private bool syncEveryFrame = true;
@@ -35,37 +31,31 @@ public class BookTextCaptureSync : MonoBehaviour
     [ContextMenu("Sync Now")]
     public void SyncNow()
     {
-        Copy(sourceLeftTitle, captureLeftTitle);
-        Copy(sourceLeftContent, captureLeftContent);
-        Copy(sourceRightTitle, captureRightTitle);
-        Copy(sourceRightContent, captureRightContent);
+        Copy(sourceLeftPage, captureLeftPage);
+        Copy(sourceRightPage, captureRightPage);
     }
 
-    private void Copy(TMP_Text source, TMP_Text target)
+    private void Copy(Image source, Image target)
     {
         if (source == null || target == null)
             return;
 
-        if (target.text != source.text)
-            target.text = source.text;
+        if (target.sprite != source.sprite)
+            target.sprite = source.sprite;
 
         if (!syncStyle)
             return;
 
-        target.font = source.font;
-        target.fontSharedMaterial = source.fontSharedMaterial;
-        target.fontSize = source.fontSize;
-        target.enableWordWrapping = source.enableWordWrapping;
-        target.overflowMode = source.overflowMode;
-        target.alignment = source.alignment;
-        target.margin = source.margin;
         target.color = source.color;
-        target.lineSpacing = source.lineSpacing;
-        target.characterSpacing = source.characterSpacing;
-        target.wordSpacing = source.wordSpacing;
-        target.enableAutoSizing = source.enableAutoSizing;
-        target.fontSizeMin = source.fontSizeMin;
-        target.fontSizeMax = source.fontSizeMax;
-        target.richText = source.richText;
+        target.material = source.material;
+        target.type = source.type;
+        target.preserveAspect = source.preserveAspect;
+        target.fillCenter = source.fillCenter;
+        target.fillMethod = source.fillMethod;
+        target.fillAmount = source.fillAmount;
+        target.fillClockwise = source.fillClockwise;
+        target.fillOrigin = source.fillOrigin;
+        target.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
+        target.useSpriteMesh = source.useSpriteMesh;
     }
 }
