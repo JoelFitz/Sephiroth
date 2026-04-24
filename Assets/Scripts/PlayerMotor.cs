@@ -60,6 +60,11 @@ public class PlayerMotor : MonoBehaviour
         SetupRigidbody();
     }
 
+    void Start()
+    {
+        UpdateGrounded();
+    }
+
     void SetupRigidbody()
     {
         // Let Unity handle gravity; we only control horizontal velocity.
@@ -87,8 +92,17 @@ public class PlayerMotor : MonoBehaviour
 
     void UpdateGrounded()
     {
-        Vector3 origin = transform.position + Vector3.up * 0.1f;
-        isGrounded = Physics.Raycast(origin, Vector3.down, groundCheckDistance, groundMask,
+        if (capsule == null)
+        {
+            isGrounded = false;
+            return;
+        }
+
+        Bounds bounds = capsule.bounds;
+        Vector3 origin = new Vector3(bounds.center.x, bounds.min.y + 0.02f, bounds.center.z);
+        int mask = groundMask & ~(1 << gameObject.layer);
+
+        isGrounded = Physics.Raycast(origin, Vector3.down, groundCheckDistance, mask,
                                      QueryTriggerInteraction.Ignore);
     }
 
@@ -238,6 +252,18 @@ public class PlayerMotor : MonoBehaviour
             rb.MovePosition(worldPosition);
         else
             transform.position = worldPosition;
+    }
+
+    public bool Jump(float jumpHeight)
+    {
+        if (rb == null || !movementEnabled || !isGrounded)
+            return false;
+
+        float jumpVelocity = Mathf.Sqrt(Mathf.Max(0f, jumpHeight) * -2f * Physics.gravity.y);
+        Vector3 currentVelocity = rb.linearVelocity;
+        rb.linearVelocity = new Vector3(currentVelocity.x, jumpVelocity, currentVelocity.z);
+        isGrounded = false;
+        return true;
     }
 
     public void SetMovementEnabled(bool enabled)

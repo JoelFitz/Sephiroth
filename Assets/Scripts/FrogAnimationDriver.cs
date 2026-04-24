@@ -5,6 +5,7 @@ public class FrogAnimationDriver : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private OverheadController overheadController;
+    [SerializeField] private PlayerMotor playerMotor;
     [SerializeField] private Animator animator;
     [SerializeField] private CharacterController characterController;
 
@@ -39,6 +40,7 @@ public class FrogAnimationDriver : MonoBehaviour
     void Awake()
     {
         overheadController = overheadController != null ? overheadController : GetComponent<OverheadController>();
+        playerMotor = playerMotor != null ? playerMotor : GetComponent<PlayerMotor>();
         characterController = characterController != null ? characterController : GetComponent<CharacterController>();
         animator = ResolveAnimator();
 
@@ -82,11 +84,13 @@ public class FrogAnimationDriver : MonoBehaviour
         }
 
         bool jumpPressed = overheadController != null && Input.GetKeyDown(overheadController.jumpKey);
-        bool grounded = characterController == null || characterController.isGrounded;
+        bool grounded = playerMotor != null
+            ? playerMotor.IsGrounded()
+            : characterController == null || characterController.isGrounded;
 
         if (jumpPressed || !grounded)
         {
-            PlayState(jumpState, transitionDuration);
+            PlayState(jumpState, transitionDuration, jumpPressed);
             return;
         }
 
@@ -196,12 +200,12 @@ public class FrogAnimationDriver : MonoBehaviour
         return stateName;
     }
 
-    void PlayState(ResolvedState state, float fade)
+    void PlayState(ResolvedState state, float fade, bool forceRestart = false)
     {
         if (!state.valid || animator == null)
             return;
 
-        if (currentState.valid && currentState.fullPathHash == state.fullPathHash)
+        if (!forceRestart && currentState.valid && currentState.fullPathHash == state.fullPathHash)
             return;
 
         string statePath = !string.IsNullOrWhiteSpace(state.fullPathName)

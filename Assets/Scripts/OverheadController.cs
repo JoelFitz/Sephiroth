@@ -479,10 +479,16 @@ public class OverheadController : MonoBehaviour
         if (!movementEnabled)
             return;
 
-        if (playerMotor != null)
+        if (!Input.GetKeyDown(jumpKey))
             return;
 
-        if (!Input.GetKeyDown(jumpKey) || !isGrounded)
+        if (playerMotor != null)
+        {
+            playerMotor.Jump(jumpHeight);
+            return;
+        }
+
+        if (!isGrounded)
             return;
 
         velocity.y = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
