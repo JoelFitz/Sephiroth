@@ -26,6 +26,9 @@
         },
         {
             "m_Id": "ee7c8b9e9a7841a1b182580d1f53f869"
+        },
+        {
+            "m_Id": "a40a6a017f984ebbaafea65513c33fff"
         }
     ],
     "m_Keywords": [],
@@ -1959,6 +1962,9 @@
         },
         {
             "m_Id": "ee7c8b9e9a7841a1b182580d1f53f869"
+        },
+        {
+            "m_Id": "a40a6a017f984ebbaafea65513c33fff"
         }
     ]
 }
@@ -4100,6 +4106,29 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Internal.BooleanShaderProperty",
+    "m_ObjectId": "a40a6a017f984ebbaafea65513c33fff",
+    "m_Guid": {
+        "m_GuidSerialized": "c3259519-05b7-4c64-bab2-6f0aba71ecbf"
+    },
+    "m_Name": "UseWorldAligned",
+    "m_DefaultRefNameVersion": 1,
+    "m_RefNameGeneratedByDisplayName": "UseWorldAligned",
+    "m_DefaultReferenceName": "_UseWorldAligned",
+    "m_OverrideReferenceName": "",
+    "m_GeneratePropertyBlock": true,
+    "m_UseCustomSlotLabel": false,
+    "m_CustomSlotLabel": "",
+    "m_DismissedVersion": 0,
+    "m_Precision": 0,
+    "overrideHLSLDeclaration": false,
+    "hlslDeclarationOverride": 0,
+    "m_Hidden": false,
+    "m_Value": true
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
     "m_ObjectId": "a4d520dc362d469796eb3a0e19e23fa0",
     "m_Id": 2,
@@ -5022,10 +5051,10 @@
         "m_Expanded": true,
         "m_Position": {
             "serializedVersion": "2",
-            "x": 1734.6666259765625,
-            "y": -499.3333740234375,
+            "x": 1656.66650390625,
+            "y": -500.6666564941406,
             "width": 124.0,
-            "height": 36.0
+            "height": 36.000030517578128
         }
     },
     "m_Slots": [
