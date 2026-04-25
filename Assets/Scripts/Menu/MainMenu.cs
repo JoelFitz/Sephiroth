@@ -11,6 +11,8 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     public GameObject loadGamePanel;
     public GameObject galleryPanel;
     public GameObject settingsPanel;
+    public GameObject audioSettingsPanel;
+    public GameObject visualSettingsPanel;
     public GameObject creditsPanel;
     public GameObject quitBoxPanel;
 
@@ -22,10 +24,16 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     public Button creditsButton;
     public Button quitButton;
 
+    [Header("Settings Buttons")]
+    public Button audioSettingsButton;
+    public Button visualSettingsButton;
+
     [Header("Back Buttons")]
     public Button loadGameBackButton;
     public Button galleryBackButton;
     public Button settingsBackButton;
+    public Button audioSettingsBackButton;
+    public Button visualSettingsBackButton;
     public Button creditsBackButton;
 
     [Header("Quit Box Buttons")]
@@ -49,6 +57,13 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     public Vector3 quitBoxStartScale = Vector3.zero;
     public Vector3 quitBoxTargetScale = Vector3.one;
     [SerializeField] private AnimationCurve quitBoxAnimationCurve;
+
+    [Header("UI Audio")]
+    public AudioSource uiAudioSource;
+    public AudioClip buttonClickClip;
+    public AudioClip buttonHoverClip;
+    [Range(0f, 1f)] public float buttonClickVolume = 1f;
+    [Range(0f, 1f)] public float buttonHoverVolume = 0.8f;
 
     private CanvasGroup mainCanvasGroup;
     private CanvasGroup quitBoxCanvasGroup;
@@ -86,6 +101,18 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
             if (quitBoxCanvasGroup == null)
                 quitBoxCanvasGroup = quitBoxPanel.AddComponent<CanvasGroup>();
         }
+
+        // Setup UI audio source
+        if (uiAudioSource == null)
+        {
+            uiAudioSource = GetComponent<AudioSource>();
+            if (uiAudioSource == null)
+                uiAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        uiAudioSource.playOnAwake = false;
+        uiAudioSource.loop = false;
+        uiAudioSource.spatialBlend = 0f;
 
         // Cache all main menu buttons
         allMainMenuButtons = new Button[]
@@ -128,6 +155,13 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         if (quitButton != null)
             quitButton.onClick.AddListener(OnQuitClicked);
 
+        // Settings submenu buttons
+        if (audioSettingsButton != null)
+            audioSettingsButton.onClick.AddListener(OnAudioSettingsClicked);
+
+        if (visualSettingsButton != null)
+            visualSettingsButton.onClick.AddListener(OnVisualSettingsClicked);
+
         // Back buttons
         if (loadGameBackButton != null)
             loadGameBackButton.onClick.AddListener(OnBackToMainMenu);
@@ -137,6 +171,12 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
         if (settingsBackButton != null)
             settingsBackButton.onClick.AddListener(OnBackToMainMenu);
+
+        if (audioSettingsBackButton != null)
+            audioSettingsBackButton.onClick.AddListener(OnBackToSettingsMenu);
+
+        if (visualSettingsBackButton != null)
+            visualSettingsBackButton.onClick.AddListener(OnBackToSettingsMenu);
 
         if (creditsBackButton != null)
             creditsBackButton.onClick.AddListener(OnBackToMainMenu);
@@ -169,7 +209,13 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         SetupBackButtonHover(loadGameBackButton);
         SetupBackButtonHover(galleryBackButton);
         SetupBackButtonHover(settingsBackButton);
+        SetupBackButtonHover(audioSettingsBackButton);
+        SetupBackButtonHover(visualSettingsBackButton);
         SetupBackButtonHover(creditsBackButton);
+
+        // Setup hover for settings buttons
+        SetupBackButtonHover(audioSettingsButton);
+        SetupBackButtonHover(visualSettingsButton);
 
         // Setup hover for quit box buttons
         SetupBackButtonHover(quitYesButton);
@@ -203,6 +249,12 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
         if (settingsPanel != null)
             settingsPanel.SetActive(false);
+
+        if (audioSettingsPanel != null)
+            audioSettingsPanel.SetActive(false);
+
+        if (visualSettingsPanel != null)
+            visualSettingsPanel.SetActive(false);
 
         if (creditsPanel != null)
             creditsPanel.SetActive(false);
@@ -250,6 +302,23 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         Debug.Log("Opening settings panel...");
         AnimateButtonClick(settingsButton.transform);
         SwitchPanel(settingsPanel);
+        OpenSettingsRoot();
+    }
+
+    void OnAudioSettingsClicked()
+    {
+        Debug.Log("Opening audio settings...");
+        if (audioSettingsButton != null)
+            AnimateButtonClick(audioSettingsButton.transform);
+        OpenAudioSettings();
+    }
+
+    void OnVisualSettingsClicked()
+    {
+        Debug.Log("Opening visual settings...");
+        if (visualSettingsButton != null)
+            AnimateButtonClick(visualSettingsButton.transform);
+        OpenVisualSettings();
     }
 
     void OnCreditsClicked()
@@ -289,6 +358,12 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         Debug.Log("Returning to main menu...");
         SwitchPanel(mainMenuPanel);
+    }
+
+    void OnBackToSettingsMenu()
+    {
+        Debug.Log("Returning to settings menu...");
+        OpenSettingsRoot();
     }
 
     #endregion
@@ -378,6 +453,42 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
     #region Panel Management
 
+    void OpenSettingsRoot()
+    {
+        if (settingsPanel != null)
+            settingsPanel.SetActive(true);
+
+        if (audioSettingsPanel != null)
+            audioSettingsPanel.SetActive(false);
+
+        if (visualSettingsPanel != null)
+            visualSettingsPanel.SetActive(false);
+    }
+
+    void OpenAudioSettings()
+    {
+        if (settingsPanel != null)
+            settingsPanel.SetActive(false);
+
+        if (audioSettingsPanel != null)
+            audioSettingsPanel.SetActive(true);
+
+        if (visualSettingsPanel != null)
+            visualSettingsPanel.SetActive(false);
+    }
+
+    void OpenVisualSettings()
+    {
+        if (settingsPanel != null)
+            settingsPanel.SetActive(false);
+
+        if (audioSettingsPanel != null)
+            audioSettingsPanel.SetActive(false);
+
+        if (visualSettingsPanel != null)
+            visualSettingsPanel.SetActive(true);
+    }
+
     void SwitchPanel(GameObject targetPanel)
     {
         // Deactivate all main panels (but not QuitBox)
@@ -393,12 +504,21 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         if (settingsPanel != null)
             settingsPanel.SetActive(false);
 
+        if (audioSettingsPanel != null)
+            audioSettingsPanel.SetActive(false);
+
+        if (visualSettingsPanel != null)
+            visualSettingsPanel.SetActive(false);
+
         if (creditsPanel != null)
             creditsPanel.SetActive(false);
 
         // Activate target panel
         if (targetPanel != null)
             targetPanel.SetActive(true);
+
+        if (targetPanel == settingsPanel)
+            OpenSettingsRoot();
     }
 
     #endregion
@@ -456,6 +576,7 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
     void AnimateButtonClick(Transform buttonTransform)
     {
+        PlayButtonClickSound();
         StartCoroutine(ButtonClickAnimation(buttonTransform));
     }
 
@@ -490,7 +611,10 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     public void OnButtonHoverEnter(Button hoveredButton)
     {
         if (hoveredButton != null)
+        {
+            PlayButtonHoverSound();
             StartCoroutine(ButtonHoverEnterAnimation(hoveredButton.transform));
+        }
     }
 
     public void OnButtonHoverExit(Button hoveredButton)
@@ -531,6 +655,26 @@ public class MainMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         }
 
         buttonTransform.localScale = originalScale;
+    }
+
+    #endregion
+
+    #region Audio
+
+    void PlayButtonClickSound()
+    {
+        if (uiAudioSource == null || buttonClickClip == null)
+            return;
+
+        uiAudioSource.PlayOneShot(buttonClickClip, buttonClickVolume);
+    }
+
+    void PlayButtonHoverSound()
+    {
+        if (uiAudioSource == null || buttonHoverClip == null)
+            return;
+
+        uiAudioSource.PlayOneShot(buttonHoverClip, buttonHoverVolume);
     }
 
     #endregion
