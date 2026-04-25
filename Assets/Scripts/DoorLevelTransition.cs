@@ -211,6 +211,8 @@ public class DoorLevelTransition : MonoBehaviour
         PlayerPrefs.SetFloat("SpawnRotY", transitionData.playerSpawnRotation);
         PlayerPrefs.SetString("LastDoorUsed", transitionData.doorName);
         PlayerPrefs.Save();
+        
+        Debug.Log($"DoorLevelTransition: Stored spawn data - Position: {transitionData.playerSpawnPosition}, Door: '{transitionData.doorName}'");
     }
 
     void UpdatePromptText()
@@ -291,6 +293,11 @@ public class DoorLevelTransition : MonoBehaviour
         {
             StartTransition();
         }
+    }
+
+    public bool CanPlayerInteractNow()
+    {
+        return playerInRange && !isTransitioning;
     }
 
     /// <summary>

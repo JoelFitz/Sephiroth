@@ -330,6 +330,11 @@ public class PlayerSleep : MonoBehaviour
         return isSleeping;
     }
 
+    public bool CanPlayerSleepNow()
+    {
+        return playerInRange && !isSleeping && currentSleepState == SleepState.Awake;
+    }
+
     /// <summary>
     /// Get the current sleep state
     /// </summary>

@@ -87,7 +87,8 @@ public class MailSystem : MonoBehaviour
 
             if (mailUIPanel != null)
             {
-                DontDestroyOnLoad(mailUIPanel);
+                GameObject panelRoot = mailUIPanel.transform.root.gameObject;
+                DontDestroyOnLoad(panelRoot);
             }
         }
         else

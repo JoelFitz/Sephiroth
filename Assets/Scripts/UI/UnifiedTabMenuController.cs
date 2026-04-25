@@ -34,6 +34,7 @@ public class UnifiedTabMenuController : MonoBehaviour
     private MushroomResearchBook researchBook;
     private Book3DInteraction book3DInteraction;
     private OverheadController playerController;
+    private bool hasLoggedMissingDependencies;
 
     private void Awake()
     {
@@ -240,16 +241,52 @@ public class UnifiedTabMenuController : MonoBehaviour
             book3DInteraction = Object.FindFirstObjectByType<Book3DInteraction>();
 
         if (playerController == null)
-            playerController = Object.FindFirstObjectByType<OverheadController>();
+            playerController = FindPreferredPlayerController();
 
-        if (mailSystem == null)
-            Debug.LogWarning("UnifiedTabMenuController: MailSystem not found in scene.");
-        if (inventorySystem == null)
-            Debug.LogWarning("UnifiedTabMenuController: InventorySystem not found in scene.");
-        if (researchBook == null)
-            Debug.LogWarning("UnifiedTabMenuController: MushroomResearchBook not found in scene.");
-        if (playerController == null)
-            Debug.LogWarning("UnifiedTabMenuController: OverheadController not found in scene.");
+        bool missingMail = mailSystem == null;
+        bool missingInventory = inventorySystem == null;
+        bool missingResearch = researchBook == null;
+        bool missingPlayer = playerController == null;
+
+        bool anyMissing = missingMail || missingInventory || missingResearch || missingPlayer;
+        if (anyMissing)
+        {
+            if (!hasLoggedMissingDependencies)
+            {
+                if (missingMail)
+                    Debug.LogWarning("UnifiedTabMenuController: MailSystem not found in scene.");
+                if (missingInventory)
+                    Debug.LogWarning("UnifiedTabMenuController: InventorySystem not found in scene.");
+                if (missingResearch)
+                    Debug.LogWarning("UnifiedTabMenuController: MushroomResearchBook not found in scene.");
+                if (missingPlayer)
+                    Debug.LogWarning("UnifiedTabMenuController: OverheadController not found in scene.");
+
+                hasLoggedMissingDependencies = true;
+            }
+        }
+        else
+        {
+            hasLoggedMissingDependencies = false;
+        }
+    }
+
+    private OverheadController FindPreferredPlayerController()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        OverheadController[] controllers = Object.FindObjectsByType<OverheadController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            OverheadController candidate = controllers[i];
+            if (candidate == null)
+                continue;
+
+            if (candidate.gameObject.scene == activeScene)
+                return candidate;
+        }
+
+        return controllers.Length > 0 ? controllers[0] : null;
     }
 
     private void ApplyInputOwnership()

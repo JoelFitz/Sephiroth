@@ -733,7 +733,7 @@ public class FrogTongueController : MonoBehaviour
         int segmentsNeeded = Mathf.Max(
             0, Mathf.FloorToInt(currentTongueLength / segmentLength));
 
-        for (int i = 0; i < segmentsNeeded; i++)
+        for (int i = 0; i < segmentsNeeded && i < tongueSegmentObjects.Count; i++)
         {
             if (tongueSegmentObjects[i] != null)
             {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using UnityEngine.SceneManagement;
 
 public class OverheadController : MonoBehaviour
 {
@@ -101,9 +102,21 @@ public class OverheadController : MonoBehaviour
     private bool hasInitializedGroundState;
     private float footstepTimer;
 
+    private static Camera persistentMainCamera;
+
     void Awake()
     {
         EnsurePlayerAudioController();
+    }
+
+    void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -113,10 +126,10 @@ public class OverheadController : MonoBehaviour
         characterController = GetComponent<CharacterController>();
         playerMotor = GetComponent<PlayerMotor>();
 
-        if (cameraTransform == null)
+        if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
 
-        cam = cameraTransform.GetComponent<Camera>();
+        BindPersistentCamera();
 
         defaultCameraHeight = cameraHeight;
         defaultCameraDistance = cameraDistance;
@@ -144,6 +157,58 @@ public class OverheadController : MonoBehaviour
         // Ensure cursor is locked at startup (in case UI systems haven't initialized yet)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        BindPersistentCamera();
+    }
+
+    void BindPersistentCamera()
+    {
+        if (persistentMainCamera == null)
+        {
+            if (cameraTransform == null)
+                return;
+
+            Camera initialCamera = cameraTransform.GetComponent<Camera>();
+            if (initialCamera == null)
+                return;
+
+            persistentMainCamera = initialCamera;
+            DontDestroyOnLoad(persistentMainCamera.gameObject);
+        }
+        else
+        {
+            if (cameraTransform != null && cameraTransform != persistentMainCamera.transform)
+            {
+                Camera sceneCamera = cameraTransform.GetComponent<Camera>();
+                if (sceneCamera != null && sceneCamera.CompareTag("MainCamera"))
+                    Destroy(sceneCamera.gameObject);
+            }
+
+            cameraTransform = persistentMainCamera.transform;
+        }
+
+        RemoveDuplicateMainCameras();
+        cam = cameraTransform != null ? cameraTransform.GetComponent<Camera>() : null;
+    }
+
+    void RemoveDuplicateMainCameras()
+    {
+        if (persistentMainCamera == null)
+            return;
+
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < allCameras.Length; i++)
+        {
+            Camera c = allCameras[i];
+            if (c == null || c == persistentMainCamera)
+                continue;
+
+            if (c.CompareTag("MainCamera"))
+                Destroy(c.gameObject);
+        }
     }
 
     void SetupCamera()
@@ -548,7 +613,11 @@ public class OverheadController : MonoBehaviour
     // The ONLY place that writes to cameraTransform.position / rotation.
     void HandleCameraFollow()
     {
-        if (cameraTransform == null) return;
+        if (cameraTransform == null)
+        {
+            Debug.LogWarning("HandleCameraFollow: cameraTransform is NULL!");
+            return;
+        }
 
         // cameraOffset was just baked in LateUpdate before this call,
         // and transform.position is the Rigidbody-interpolated position — no stale data.

@@ -24,8 +24,12 @@ public class PlayerSpawnManager : MonoBehaviour
             return;
         }
 
+        Debug.Log($"PlayerSpawnManager: Found player at {player.transform.position}");
+
         Vector3 spawnPos = GetSpawnPosition();
         float spawnRot = GetSpawnRotation();
+
+        Debug.Log($"PlayerSpawnManager: Calculated spawn position: {spawnPos}, rotation: {spawnRot}");
 
         // Position the player
         if (player.GetComponent<CharacterController>() != null)
@@ -36,12 +40,24 @@ public class PlayerSpawnManager : MonoBehaviour
             player.transform.position = spawnPos;
             player.transform.rotation = Quaternion.Euler(0, spawnRot, 0);
             cc.enabled = true;
+            Debug.Log($"PlayerSpawnManager: Moved player (CharacterController path) to {spawnPos}");
         }
         else
         {
             // For Rigidbody or regular transform
-            player.transform.position = spawnPos;
-            player.transform.rotation = Quaternion.Euler(0, spawnRot, 0);
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.MovePosition(spawnPos);
+                rb.rotation = Quaternion.Euler(0, spawnRot, 0);
+                Debug.Log($"PlayerSpawnManager: Moved player (Rigidbody path) to {spawnPos}");
+            }
+            else
+            {
+                player.transform.position = spawnPos;
+                player.transform.rotation = Quaternion.Euler(0, spawnRot, 0);
+                Debug.Log($"PlayerSpawnManager: Moved player (Transform path) to {spawnPos}");
+            }
         }
 
         Debug.Log($"Player spawned at {spawnPos} facing {spawnRot} degrees");
@@ -55,30 +71,46 @@ public class PlayerSpawnManager : MonoBehaviour
         // Check if we have stored spawn data from a door transition
         if (PlayerPrefs.HasKey("SpawnPosX"))
         {
-            return new Vector3(
+            Vector3 pos = new Vector3(
                 PlayerPrefs.GetFloat("SpawnPosX"),
                 PlayerPrefs.GetFloat("SpawnPosY"),
                 PlayerPrefs.GetFloat("SpawnPosZ")
             );
+            Debug.Log($"PlayerSpawnManager: Using stored spawn data from PlayerPrefs: {pos}");
+            return pos;
         }
 
         // Check for scene-specific spawn points
         string lastDoor = PlayerPrefs.GetString("LastDoorUsed", "");
         if (!string.IsNullOrEmpty(lastDoor))
         {
-            foreach (var spawnPoint in doorSpawnPoints)
+            Debug.Log($"PlayerSpawnManager: LastDoorUsed = '{lastDoor}', checking doorSpawnPoints array ({doorSpawnPoints?.Length ?? 0} entries)");
+            if (doorSpawnPoints != null)
             {
-                if (spawnPoint.fromDoorName == lastDoor)
+                foreach (var spawnPoint in doorSpawnPoints)
                 {
-                    return spawnPoint.spawnPosition;
+                    if (spawnPoint.fromDoorName == lastDoor)
+                    {
+                        Debug.Log($"PlayerSpawnManager: Found matching door spawn point: {spawnPoint.spawnPosition}");
+                        return spawnPoint.spawnPosition;
+                    }
                 }
             }
+            Debug.Log($"PlayerSpawnManager: No matching door spawn point found for '{lastDoor}'");
+        }
+        else
+        {
+            Debug.Log("PlayerSpawnManager: No spawn data in PlayerPrefs");
         }
 
         // Use default spawn
         if (defaultSpawnPoint != null)
+        {
+            Debug.Log($"PlayerSpawnManager: Using defaultSpawnPoint: {defaultSpawnPoint.position}");
             return defaultSpawnPoint.position;
+        }
 
+        Debug.Log($"PlayerSpawnManager: Using defaultSpawnPosition: {defaultSpawnPosition}");
         return defaultSpawnPosition;
     }
 

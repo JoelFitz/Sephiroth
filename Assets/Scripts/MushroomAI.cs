@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public enum MushroomState
 {
@@ -55,9 +56,24 @@ public class MushroomAI : MonoBehaviour
 
     private Vector3 modelOriginalLocalPosition;
 
+    void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
     void Start()
     {
         InitializeMushroom();
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        TryResolvePlayer();
     }
 
     void InitializeMushroom()
@@ -67,11 +83,7 @@ public class MushroomAI : MonoBehaviour
         rb = GetComponent<Rigidbody>();
 
         // Find player if not assigned
-        if (player == null)
-        {
-            var playerObj = GameObject.FindWithTag("Player");
-            if (playerObj != null) player = playerObj.transform;
-        }
+        TryResolvePlayer();
 
         // Store original position of the ROOT GameObject
         originalPosition = transform.position;
@@ -117,11 +129,46 @@ public class MushroomAI : MonoBehaviour
 
     void Update()
     {
+        if (player == null)
+            TryResolvePlayer();
+
         if (player == null || mushroomData == null) return;
 
         UpdateDetection();
         UpdateStateBehavior();
         UpdateVisuals();
+    }
+
+    void TryResolvePlayer()
+    {
+        if (player != null)
+            return;
+
+        OverheadController[] controllers = FindObjectsByType<OverheadController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Scene activeScene = SceneManager.GetActiveScene();
+
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            OverheadController candidate = controllers[i];
+            if (candidate == null)
+                continue;
+
+            if (candidate.gameObject.scene == activeScene)
+            {
+                player = candidate.transform;
+                return;
+            }
+        }
+
+        if (controllers.Length > 0 && controllers[0] != null)
+        {
+            player = controllers[0].transform;
+            return;
+        }
+
+        GameObject playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+            player = playerObj.transform;
     }
 
     void UpdateDetection()
