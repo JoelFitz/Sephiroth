@@ -1,25 +1,27 @@
-﻿using UnityEngine;
+﻿using System.Reflection;
+using UnityEngine;
 
 public class CamouflageOysterPersonality : MushroomPersonality
 {
-    [Header("Camouflage Behavior")]
-    public float detectionAngle = 60f;
-    public float sneakSpeed = 1.5f;
+    public override bool AllowAmbientIdleWander => true;
+
+    [Header("Electric Lilac Behavior")]
     public float fleeSpeed = 9f;
-    public float maxSneakDistance = 20f;
-    public float checkInterval = 0.1f; 
+    public float fleeDistance = 20f;
+    public float electricJoltCooldown = 1.5f;
+    public AudioClip electricJoltSound;
+    public GameObject electricJoltEffect;
 
     private Vector3 fleeStartPosition;
-    private bool isBeingWatched = false;
-    private float lastCheckTime = 0f;
+    private float lastJoltTime = -999f;
+    private MethodInfo enterStunMethod;
 
     public override void UpdateBehavior()
     {
-        // Only check visibility periodically for performance
-        if (Time.time - lastCheckTime > checkInterval)
+        if (mushroomAI.currentState == MushroomState.TongueGrabbed)
         {
-            CheckIfBeingWatched();
-            lastCheckTime = Time.time;
+            mushroomAI.StopMushroom();
+            return;
         }
 
         switch (mushroomAI.currentState)
@@ -42,173 +44,102 @@ public class CamouflageOysterPersonality : MushroomPersonality
         }
     }
 
-    void CheckIfBeingWatched()
-    {
-        if (mushroomAI.Player == null)
-        {
-            isBeingWatched = false;
-            return;
-        }
-
-        // Get player's camera
-        Camera playerCamera = Camera.main;
-        if (playerCamera == null)
-        {
-            // Fallback to using player transform forward
-            Vector3 directionToMushroom = (transform.position - mushroomAI.Player.position).normalized;
-            float angle = Vector3.Angle(mushroomAI.Player.forward, directionToMushroom);
-            isBeingWatched = angle < detectionAngle && mushroomAI.PlayerInRange;
-            return;
-        }
-
-        // Calculate direction from camera to mushroom
-        Vector3 cameraToMushroom = transform.position - playerCamera.transform.position;
-        float distanceToCamera = cameraToMushroom.magnitude;
-
-        // Check if mushroom is in front of camera
-        float dotProduct = Vector3.Dot(playerCamera.transform.forward, cameraToMushroom.normalized);
-
-        // Convert to angle
-        float viewAngle = Mathf.Acos(Mathf.Clamp(dotProduct, -1f, 1f)) * Mathf.Rad2Deg;
-
-        // Additional raycast check to see if mushroom is actually visible (not blocked by walls)
-        bool hasLineOfSight = false;
-        bool isInViewCone = viewAngle < detectionAngle;
-
-        if (isInViewCone)
-        {
-            RaycastHit hit;
-            Vector3 rayOrigin = playerCamera.transform.position;
-            Vector3 rayDirection = cameraToMushroom.normalized;
-
-            if (Physics.Raycast(rayOrigin, rayDirection, out hit, distanceToCamera + 1f))
-            {
-                // Check if raycast hit this mushroom or any of its children
-                MushroomAI hitMushroom = hit.transform.GetComponentInParent<MushroomAI>();
-                hasLineOfSight = hitMushroom == mushroomAI;
-
-                if (Time.frameCount % 60 == 0)
-                {
-                    Debug.Log($"Raycast hit: {hit.transform.name}, Is this mushroom: {hasLineOfSight}");
-                }
-            }
-        }
-
-        // Must be in view cone, in range, AND have line of sight to be considered "watched"
-        isBeingWatched = isInViewCone && mushroomAI.PlayerInRange && hasLineOfSight;
-
-        // Debug
-        if (Time.frameCount % 60 == 0)
-        {
-            Debug.Log($"Oyster {name}: Angle={viewAngle:F1}, InViewCone={isInViewCone}, InRange={mushroomAI.PlayerInRange}, LineOfSight={hasLineOfSight}, BeingWatched={isBeingWatched}");
-        }
-    }
-
     void HandleHiddenState()
     {
         mushroomAI.StopMushroom();
 
         if (mushroomAI.StateTimer > 2f)
-        {
             ChangeState(MushroomState.Idle);
-        }
     }
 
     void HandleIdleState()
     {
         mushroomAI.StopMushroom();
 
-        // Start sneaking as soon as player is in range
         if (mushroomAI.PlayerInRange)
         {
-            ChangeState(MushroomState.Alert);
+            fleeStartPosition = transform.position;
+            ChangeState(MushroomState.Fleeing);
         }
     }
 
     void HandleAlertState()
     {
-        if (mushroomAI.Player == null)
-        {
-            ChangeState(MushroomState.Hidden);
-            return;
-        }
-
-        if (isBeingWatched)
-        {
-            // Freeze completely when being watched
-            mushroomAI.StopMushroom();
-
-            if (Time.frameCount % 30 == 0)
-            {
-                Debug.Log($"Oyster FROZEN - Being watched!");
-            }
-
-            // If player gets too close while watching, panic and flee
-            float distanceToPlayer = Vector3.Distance(transform.position, mushroomAI.Player.position);
-            if (distanceToPlayer < 3f)
-            {
-                fleeStartPosition = transform.position;
-                ChangeState(MushroomState.Fleeing);
-            }
-        }
-        else
-        {
-            // Player is in range but not looking - sneak away!
-            if (mushroomAI.Player != null)
-            {
-                Vector3 sneakDirection = (transform.position - mushroomAI.Player.position).normalized;
-                mushroomAI.MoveMushroom(sneakDirection, sneakSpeed);
-
-                if (Time.frameCount % 30 == 0)
-                {
-                    Debug.Log($"Oyster SNEAKING - Not being watched!");
-                }
-            }
-        }
-
-        // Check if escaped far enough
-        float distanceMoved = Vector3.Distance(transform.position, mushroomAI.OriginalPosition);
-        if (distanceMoved > maxSneakDistance)
-        {
-            ChangeState(MushroomState.Hidden);
-        }
-
-        // Return to hidden if player leaves range
-        if (!mushroomAI.PlayerInRange)
-        {
-            ChangeState(MushroomState.Hidden);
-        }
+        HandleFleeingState();
     }
 
     void HandleFleeingState()
     {
-        if (mushroomAI.Player != null)
+        if (mushroomAI.Player == null)
         {
-            // Flee at max speed regardless of being watched
-            Vector3 fleeDirection = (transform.position - mushroomAI.Player.position).normalized;
-            mushroomAI.MoveMushroom(fleeDirection, fleeSpeed);
+            mushroomAI.StopMushroom();
+            ChangeState(MushroomState.Hidden);
+            return;
         }
 
-        float distanceFled = Vector3.Distance(transform.position, fleeStartPosition);
-        if (distanceFled > 10f || !mushroomAI.PlayerInRange)
+        Vector3 fleeDirection = (transform.position - mushroomAI.Player.position).normalized;
+        mushroomAI.MoveMushroom(fleeDirection, fleeSpeed);
+
+        if (Vector3.Distance(transform.position, fleeStartPosition) > fleeDistance && !mushroomAI.PlayerInRange)
         {
             mushroomAI.StopMushroom();
             ChangeState(MushroomState.Hidden);
         }
+
+        if (!mushroomAI.PlayerInRange && mushroomAI.StateTimer > 0.75f)
+            ChangeState(MushroomState.Hidden);
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        TryJoltContact(other.gameObject);
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.collider != null)
+            TryJoltContact(collision.collider.gameObject);
+    }
+
+    void TryJoltContact(GameObject touchedObject)
+    {
+        if (mushroomAI.IsTongueGrabbed() || Time.time - lastJoltTime < electricJoltCooldown)
+            return;
+
+        if (touchedObject == null)
+            return;
+
+        PlayerHealthStatus playerHealth = touchedObject.GetComponentInParent<PlayerHealthStatus>();
+        if (playerHealth == null || playerHealth.IsStunned)
+            return;
+
+        lastJoltTime = Time.time;
+
+        if (electricJoltEffect != null)
+            Instantiate(electricJoltEffect, transform.position, Quaternion.identity);
+
+        PlayElectricJoltSound();
+        TriggerStun(playerHealth);
+    }
+
+    void TriggerStun(PlayerHealthStatus playerHealth)
+    {
+        if (playerHealth == null)
+            return;
+
+        if (enterStunMethod == null)
+            enterStunMethod = typeof(PlayerHealthStatus).GetMethod("EnterStun", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        if (enterStunMethod != null)
+            enterStunMethod.Invoke(playerHealth, null);
     }
 
     public override void OnStateChanged(MushroomState fromState, MushroomState toState)
     {
-        Debug.Log($"Camouflage Mushroom {transform.name}: {fromState} -> {toState}");
+        Debug.Log($"Electric Lilac {transform.name}: {fromState} -> {toState}");
 
-        if (toState == MushroomState.Alert)
-        {
+        if (toState == MushroomState.Fleeing)
             PlayRustleSound();
-        }
-        else if (toState == MushroomState.Fleeing)
-        {
-            PlayRustleSound();
-        }
     }
 
     void PlayRustleSound()
@@ -217,34 +148,29 @@ public class CamouflageOysterPersonality : MushroomPersonality
         {
             var audioSource = GetComponent<AudioSource>();
             if (audioSource != null)
-            {
                 audioSource.PlayOneShot(data.rustleSounds[Random.Range(0, data.rustleSounds.Length)]);
-            }
         }
+    }
+
+    void PlayElectricJoltSound()
+    {
+        if (electricJoltSound == null)
+            return;
+
+        var audioSource = GetComponent<AudioSource>();
+        if (audioSource != null)
+            audioSource.PlayOneShot(electricJoltSound);
     }
 
     void OnDrawGizmos()
     {
-        if (mushroomAI == null || mushroomAI.Player == null) return;
+        if (mushroomAI == null || mushroomAI.Player == null)
+            return;
 
-        Camera playerCamera = Camera.main;
-        if (playerCamera == null) return;
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, 1.75f);
 
-        Gizmos.color = isBeingWatched ? Color.red : Color.green;
-        Gizmos.DrawLine(playerCamera.transform.position, transform.position);
-
-        // Draw a sphere at mushroom position to show watched status
-        Gizmos.color = isBeingWatched ? Color.red : Color.green;
-        Gizmos.DrawWireSphere(transform.position, 0.5f);
-
-        // Draw detection cone from camera
-        Gizmos.color = Color.yellow;
-        Vector3 forward = playerCamera.transform.forward * mushroomAI.Data.detectionRange;
-        Vector3 right = Quaternion.Euler(0, detectionAngle, 0) * forward;
-        Vector3 left = Quaternion.Euler(0, -detectionAngle, 0) * forward;
-
-        Gizmos.DrawRay(playerCamera.transform.position, forward);
-        Gizmos.DrawRay(playerCamera.transform.position, right);
-        Gizmos.DrawRay(playerCamera.transform.position, left);
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(fleeStartPosition, fleeDistance);
     }
 }

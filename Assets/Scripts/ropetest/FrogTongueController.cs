@@ -721,6 +721,16 @@ public class FrogTongueController : MonoBehaviour
             restoringRotation = true;
     }
 
+    public bool TryForceReleaseTarget(GameObject target)
+    {
+        if (target == null || attachedTarget == null || attachedTarget != target)
+            return false;
+
+        ReleaseMushroom();
+        currentState = TongueState.Retracting;
+        return true;
+    }
+
     void HandleTongueRetraction()
     {
         hasPreviousTongueTip = false;
