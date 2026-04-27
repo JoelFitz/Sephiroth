@@ -10,21 +10,18 @@ public class MushroomResearchEntry
 {
     public string mushroomType;
     public string displayName;
-    public string scientificName;
-    [TextArea(3, 5)]
-    public string description;
-    [TextArea(2, 3)]
-    public string habitat;
-    [TextArea(2, 3)]
-    public string cookingNotes;
-    public Sprite illustration;
+    public Sprite overlaySprite;
     public bool isDiscovered = false;
     public int timesCollected = 0;
 
-    // Progressive unlock thresholds
-    public int nameUnlockCount = 1;
-    public int habitatUnlockCount = 3;
-    public int cookingUnlockCount = 5;
+    public List<ResearchPanelRevealRule> panelRevealRules = new List<ResearchPanelRevealRule>();
+}
+
+[System.Serializable]
+public class ResearchPanelRevealRule
+{
+    public GameObject panel;
+    [Min(1)] public int requiredCount = 1;
 }
 
 public class MushroomResearchBook : MonoBehaviour
@@ -76,6 +73,10 @@ public class MushroomResearchBook : MonoBehaviour
     [Header("Research Data")]
     public MushroomResearchEntry[] mushroomEntries;
 
+    [Header("Unknown Entry Fallback")]
+    [SerializeField] private Sprite unknownLeftPageSprite;
+    [SerializeField] private Sprite unknownRightPageSprite;
+
     [Header("Debug Test Pages")]
     [SerializeField] private bool useInspectorTestPages = false;
     [SerializeField] private bool includeDefaultCoverInTestPages = true;
@@ -103,9 +104,11 @@ public class MushroomResearchBook : MonoBehaviour
         public string leftTitle;
         public string leftContent;
         public Sprite leftImage;
+        public MushroomResearchEntry leftEntry;
         public string rightTitle;
         public string rightContent;
         public Sprite rightImage;
+        public MushroomResearchEntry rightEntry;
     }
 
     private sealed class FlipColorSwapTracker
@@ -437,6 +440,12 @@ public class MushroomResearchBook : MonoBehaviour
 
     public void OnMushroomCollected(string mushroomType)
     {
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+        {
+            Debug.LogWarning("MushroomResearchBook: No mushroom entries configured.");
+            return;
+        }
+
         var entry = mushroomEntries.FirstOrDefault(e => e.mushroomType == mushroomType);
         if (entry != null)
         {
@@ -453,8 +462,15 @@ public class MushroomResearchBook : MonoBehaviour
             }
 
             GenerateBookPages();
+
+            if (isBookOpen)
+                UpdatePageDisplay();
+
             SaveProgress();
+            return;
         }
+
+        Debug.LogWarning($"MushroomResearchBook: No research entry found for mushroomType '{mushroomType}'.");
     }
 
     void GenerateBookPages()
@@ -476,9 +492,11 @@ public class MushroomResearchBook : MonoBehaviour
                     leftTitle = testPair.leftTitle,
                     leftContent = testPair.leftContent,
                     leftImage = testPair.leftImage,
+                    leftEntry = null,
                     rightTitle = testPair.rightTitle,
                     rightContent = testPair.rightContent,
-                    rightImage = testPair.rightImage
+                    rightImage = testPair.rightImage,
+                    rightEntry = null
                 });
             }
 
@@ -487,6 +505,15 @@ public class MushroomResearchBook : MonoBehaviour
 
         // Cover page
         bookPages.Add(CreateDefaultCoverPage());
+
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+            return;
+
+        if (discoveredMushrooms.Count == 0)
+        {
+            bookPages.Add(CreateUnknownMushroomPagePair());
+            return;
+        }
 
         // Mushroom pages (one page pair per mushroom)
         foreach (var entry in discoveredMushrooms.OrderBy(e => e.displayName))
@@ -502,15 +529,35 @@ public class MushroomResearchBook : MonoBehaviour
             leftTitle = "Mushroom Research Journal",
             leftContent = "A Field Guide to Fungal Discoveries\n\nBy: Frog Naturalist\n\nDiscovered Species: " + discoveredMushrooms.Count,
             leftImage = null,
+            leftEntry = null,
             rightTitle = "Table of Contents",
             rightContent = GenerateTableOfContents(),
-            rightImage = null
+            rightImage = null,
+            rightEntry = null
+        };
+    }
+
+    private BookPagePair CreateUnknownMushroomPagePair()
+    {
+        return new BookPagePair
+        {
+            leftTitle = string.Empty,
+            leftContent = string.Empty,
+            leftImage = unknownLeftPageSprite,
+            leftEntry = null,
+            rightTitle = string.Empty,
+            rightContent = string.Empty,
+            rightImage = unknownRightPageSprite,
+            rightEntry = null
         };
     }
 
     [ContextMenu("Add Test Mushrooms")]
     void AddTestMushrooms()
     {
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+            return;
+
         // For testing - manually add some mushrooms as discovered
         foreach (var entry in mushroomEntries)
         {
@@ -532,7 +579,7 @@ public class MushroomResearchBook : MonoBehaviour
     string GenerateTableOfContents()
     {
         if (discoveredMushrooms.Count == 0)
-            return "No species discovered yet.\n\nExplore the world to find mushrooms!";
+            return "No species discovered yet.";
 
         string toc = "";
         int pageNum = 2; // Start after cover
@@ -550,52 +597,16 @@ public class MushroomResearchBook : MonoBehaviour
 
     BookPagePair CreateMushroomPagePair(MushroomResearchEntry entry)
     {
-        // Left page - Basic info and illustration
-        string leftContent = "";
-        if (entry.timesCollected >= entry.nameUnlockCount)
-        {
-            leftContent += $"<b>Scientific Name:</b>\n<i>{entry.scientificName}</i>\n\n";
-            leftContent += $"<b>Specimens Collected:</b> {entry.timesCollected}\n\n";
-            leftContent += $"<b>Description:</b>\n{entry.description}";
-        }
-        else
-        {
-            leftContent = "Collect this mushroom to unlock research data.";
-        }
-
-        // Right page - Habitat and cooking info
-        string rightContent = "";
-        if (entry.timesCollected >= entry.habitatUnlockCount)
-        {
-            rightContent += $"<b>Habitat:</b>\n{entry.habitat}\n\n";
-        }
-        else if (entry.timesCollected >= entry.nameUnlockCount)
-        {
-            rightContent += "<b>Habitat:</b>\n<i>[Collect more specimens]</i>\n\n";
-        }
-
-        if (entry.timesCollected >= entry.cookingUnlockCount)
-        {
-            rightContent += $"<b>Culinary Notes:</b>\n{entry.cookingNotes}";
-        }
-        else if (entry.timesCollected >= entry.nameUnlockCount)
-        {
-            rightContent += "<b>Culinary Notes:</b>\n<i>[Collect more specimens]</i>";
-        }
-
-        if (rightContent == "")
-        {
-            rightContent = "Additional research data will be unlocked as you collect more specimens of this species.";
-        }
-
         return new BookPagePair
         {
-            leftTitle = entry.isDiscovered ? entry.displayName : "Unknown Species",
-            leftContent = leftContent,
-            leftImage = entry.isDiscovered ? entry.illustration : null,
-            rightTitle = "Research Notes",
-            rightContent = rightContent,
-            rightImage = null
+            leftTitle = string.Empty,
+            leftContent = string.Empty,
+            leftImage = entry.isDiscovered ? entry.overlaySprite : null,
+            leftEntry = entry,
+            rightTitle = string.Empty,
+            rightContent = string.Empty,
+            rightImage = entry.isDiscovered ? entry.overlaySprite : null,
+            rightEntry = entry
         };
     }
 
@@ -900,6 +911,8 @@ public class MushroomResearchBook : MonoBehaviour
                 leftPageImage.sprite = pagePair.leftImage;
                 leftPageImage.gameObject.SetActive(pagePair.leftImage != null);
             }
+
+            ApplyPanelReveal(pagePair.leftEntry);
         }
 
         if (updateRight)
@@ -912,6 +925,38 @@ public class MushroomResearchBook : MonoBehaviour
             {
                 rightPageImage.sprite = pagePair.rightImage;
                 rightPageImage.gameObject.SetActive(pagePair.rightImage != null);
+            }
+
+            ApplyPanelReveal(pagePair.rightEntry);
+        }
+
+        if (!updateLeft && !updateRight)
+            ApplyPanelReveal(null);
+    }
+
+    private void ApplyPanelReveal(MushroomResearchEntry entry)
+    {
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+            return;
+
+        for (int i = 0; i < mushroomEntries.Length; i++)
+        {
+            MushroomResearchEntry candidate = mushroomEntries[i];
+            if (candidate == null || candidate.panelRevealRules == null)
+                continue;
+
+            bool shouldShow = candidate == entry && candidate.isDiscovered;
+
+            for (int ruleIndex = 0; ruleIndex < candidate.panelRevealRules.Count; ruleIndex++)
+            {
+                ResearchPanelRevealRule rule = candidate.panelRevealRules[ruleIndex];
+                if (rule == null || rule.panel == null)
+                    continue;
+
+                int requiredCount = Mathf.Max(1, rule.requiredCount);
+                bool active = shouldShow && candidate.timesCollected >= requiredCount;
+                if (rule.panel.activeSelf != active)
+                    rule.panel.SetActive(active);
             }
         }
     }
@@ -948,6 +993,9 @@ public class MushroomResearchBook : MonoBehaviour
         if (GameSessionManager.Instance != null && GameSessionManager.Instance.IsSessionActive)
             return;
 
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+            return;
+
         foreach (var entry in mushroomEntries)
         {
             PlayerPrefs.SetInt($"Mushroom_{entry.mushroomType}_Discovered", entry.isDiscovered ? 1 : 0);
@@ -959,6 +1007,13 @@ public class MushroomResearchBook : MonoBehaviour
     void LoadProgress()
     {
         discoveredMushrooms.Clear();
+
+        if (mushroomEntries == null || mushroomEntries.Length == 0)
+        {
+            GenerateBookPages();
+            ApplyPanelReveal(null);
+            return;
+        }
 
         bool useSessionState = GameSessionManager.Instance != null && GameSessionManager.Instance.IsSessionActive;
 
@@ -1001,11 +1056,19 @@ public class MushroomResearchBook : MonoBehaviour
 
         GenerateBookPages();
 
+        if (bookPages.Count <= currentPagePair)
+            currentPagePair = Mathf.Max(0, bookPages.Count - 1);
+
+        if (isBookOpen)
+            UpdatePageDisplay();
+
         Debug.Log($"Loaded {discoveredMushrooms.Count} discovered mushrooms");
         foreach (var mushroom in discoveredMushrooms)
         {
             Debug.Log($"- {mushroom.displayName} (×{mushroom.timesCollected})");
         }
+
+        ApplyPanelReveal(null);
     }
 
     public void ResetForNewGame()
@@ -1018,6 +1081,7 @@ public class MushroomResearchBook : MonoBehaviour
         builtInInputEnabled = true;
         worldInteractionEnabled = true;
         bookPages.Clear();
+        ApplyPanelReveal(null);
 
         if (bookUICanvas != null)
             bookUICanvas.gameObject.SetActive(false);
