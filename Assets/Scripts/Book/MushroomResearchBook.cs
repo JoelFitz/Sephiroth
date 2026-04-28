@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System;
 using TMPro;
 using UnityEngine.UI;
 using System.Collections;
@@ -94,6 +95,8 @@ public class MushroomResearchBook : MonoBehaviour
     private Coroutine closeBookAnimationRoutine;
     private Coroutine stagedSideSwapRoutine;
     private bool hasLoggedDepthReadabilityWarning;
+
+    public event Action<bool> OnBookStateChanged;
 
     // Page content
     private List<BookPagePair> bookPages = new List<BookPagePair>();
@@ -312,6 +315,8 @@ public class MushroomResearchBook : MonoBehaviour
         if (bookInteraction != null)
             bookInteraction.OnBookStateChanged(true);
 
+        OnBookStateChanged?.Invoke(true);
+
         // Hide interaction prompt
         if (interactionPrompt != null)
             interactionPrompt.SetActive(false);
@@ -362,6 +367,8 @@ public class MushroomResearchBook : MonoBehaviour
         // Notify interaction script
         if (bookInteraction != null)
             bookInteraction.OnBookStateChanged(false);
+
+        OnBookStateChanged?.Invoke(false);
 
         // Play 2D close animation sequence
         if (bookAnimationController != null)

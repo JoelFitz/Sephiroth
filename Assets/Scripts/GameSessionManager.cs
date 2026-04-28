@@ -77,6 +77,11 @@ public class GameSessionManager : MonoBehaviour
             MushroomResearchBook.Instance.ResetForNewGame();
         }
 
+        if (Tutorial.Instance != null)
+        {
+            Tutorial.Instance.ResetForNewGame();
+        }
+
         // Destroy only the legacy GameController if it exists
         GameController controller = Object.FindFirstObjectByType<GameController>();
         if (controller != null)
